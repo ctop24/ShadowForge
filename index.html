@@ -89,29 +89,28 @@
       ctx.clearRect(0, 0, canvas.width, canvas.height);
 
       // Draw player
-      ctx.fillStyle = 'blue';
-      ctx.beginPath();
-      ctx.arc(player.x, player.y, player.size, 0, Math.PI * 2);
-      ctx.fill();
+      drawEntity(player, 'blue');
       drawHpBar(player);
 
       // Draw creatures
-      ctx.fillStyle = 'red';
       creatures.forEach(creature => {
-        ctx.beginPath();
-        ctx.arc(creature.x, creature.y, creature.size, 0, Math.PI * 2);
-        ctx.fill();
+        drawEntity(creature, 'red');
         drawHpBar(creature);
       });
 
       // Draw allies
-      ctx.fillStyle = 'green';
       allies.forEach(ally => {
-        ctx.beginPath();
-        ctx.arc(ally.x, ally.y, ally.size, 0, Math.PI * 2);
-        ctx.fill();
+        drawEntity(ally, 'green');
         drawHpBar(ally);
       });
+    }
+
+    // Draw entity (player, creature, or ally)
+    function drawEntity(entity, color) {
+      ctx.fillStyle = color;
+      ctx.beginPath();
+      ctx.arc(entity.x, entity.y, entity.size, 0, Math.PI * 2);
+      ctx.fill();
     }
 
     // Draw HP bar above character
@@ -119,7 +118,7 @@
       const barWidth = 40;
       const barHeight = 5;
       const barX = character.x - barWidth / 2;
-      const barY = character.y - character.size - 10;
+      const barY = character.y - character.size - 15;
 
       // Draw background bar (empty part)
       ctx.fillStyle = 'gray';
