@@ -42,7 +42,8 @@
       ArrowUp: false,
       ArrowDown: false,
       ArrowLeft: false,
-      ArrowRight: false
+      ArrowRight: false,
+      Space: false // Capture action
     };
 
     window.addEventListener('keydown', (e) => {
@@ -85,29 +86,22 @@
         const distance = Math.sqrt(dx * dx + dy * dy);
 
         if (distance < player.size + creature.size) {
-          // Capture creature
-          allies.push(creatures.splice(i, 1)[0]);
-        }
-      }
-
-      // Check for collisions with enemies (damage player)
-      creatures.forEach(creature => {
-        const dx = player.x - creature.x;
-        const dy = player.y - creature.y;
-        const distance = Math.sqrt(dx * dx + dy * dy);
-
-        if (distance < player.size + creature.size && player.damageCooldown === 0) {
-          // Player takes damage
-          player.hp -= 10;
-          player.damageCooldown = 60; // Cooldown of 60 frames (1 second at 60fps)
-          if (player.hp <= 0) {
-            player.hp = 0;
-            // Game over logic (for now, just stop the game loop)
-            alert("Game Over!");
-            window.location.reload();
+          // Capture creature if Space key is pressed
+          if (keys.Space) {
+            allies.push(creatures.splice(i, 1)[0]);
+          } else if (player.damageCooldown === 0) {
+            // Player takes damage
+            player.hp -= 10;
+            player.damageCooldown = 60; // Cooldown of 60 frames (1 second at 60fps)
+            if (player.hp <= 0) {
+              player.hp = 0;
+              // Game over logic (for now, just stop the game loop)
+              alert("Game Over!");
+              window.location.reload();
+            }
           }
         }
-      });
+      }
     }
 
     // Draw game state
