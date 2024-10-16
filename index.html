@@ -30,7 +30,8 @@
       speed: 5,
       size: 20,
       hp: 100,
-      maxHp: 100
+      maxHp: 100,
+      damageCooldown: 0
     };
 
     const creatures = [];
@@ -71,6 +72,11 @@
       player.x = Math.max(0, Math.min(canvas.width, player.x));
       player.y = Math.max(0, Math.min(canvas.height, player.y));
 
+      // Reduce damage cooldown
+      if (player.damageCooldown > 0) {
+        player.damageCooldown--;
+      }
+
       // Check for collisions with creatures
       for (let i = creatures.length - 1; i >= 0; i--) {
         const creature = creatures[i];
@@ -90,9 +96,10 @@
         const dy = player.y - creature.y;
         const distance = Math.sqrt(dx * dx + dy * dy);
 
-        if (distance < player.size + creature.size) {
+        if (distance < player.size + creature.size && player.damageCooldown === 0) {
           // Player takes damage
-          player.hp -= 1;
+          player.hp -= 10;
+          player.damageCooldown = 60; // Cooldown of 60 frames (1 second at 60fps)
           if (player.hp <= 0) {
             player.hp = 0;
             // Game over logic (for now, just stop the game loop)
@@ -108,7 +115,7 @@
       ctx.clearRect(0, 0, canvas.width, canvas.height);
 
       // Draw player
-      drawEntity(player, 'blue');
+      drawEntity(player, player.damageCooldown > 0 ? 'darkblue' : 'blue');
       drawHpBar(player);
 
       // Draw creatures
