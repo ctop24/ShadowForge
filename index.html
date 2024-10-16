@@ -28,7 +28,9 @@
       x: canvas.width / 2,
       y: canvas.height / 2,
       speed: 5,
-      size: 20
+      size: 20,
+      hp: 100,
+      maxHp: 100
     };
 
     const creatures = [];
@@ -91,6 +93,7 @@
       ctx.beginPath();
       ctx.arc(player.x, player.y, player.size, 0, Math.PI * 2);
       ctx.fill();
+      drawHpBar(player);
 
       // Draw creatures
       ctx.fillStyle = 'red';
@@ -98,6 +101,7 @@
         ctx.beginPath();
         ctx.arc(creature.x, creature.y, creature.size, 0, Math.PI * 2);
         ctx.fill();
+        drawHpBar(creature);
       });
 
       // Draw allies
@@ -106,7 +110,25 @@
         ctx.beginPath();
         ctx.arc(ally.x, ally.y, ally.size, 0, Math.PI * 2);
         ctx.fill();
+        drawHpBar(ally);
       });
+    }
+
+    // Draw HP bar above character
+    function drawHpBar(character) {
+      const barWidth = 40;
+      const barHeight = 5;
+      const barX = character.x - barWidth / 2;
+      const barY = character.y - character.size - 10;
+
+      // Draw background bar (empty part)
+      ctx.fillStyle = 'gray';
+      ctx.fillRect(barX, barY, barWidth, barHeight);
+
+      // Draw filled part (current HP)
+      const hpWidth = (character.hp / character.maxHp) * barWidth;
+      ctx.fillStyle = 'red';
+      ctx.fillRect(barX, barY, hpWidth, barHeight);
     }
 
     // Spawn creatures randomly
@@ -114,7 +136,9 @@
       const creature = {
         x: Math.random() * canvas.width,
         y: Math.random() * canvas.height,
-        size: 15
+        size: 15,
+        hp: 50,
+        maxHp: 50
       };
       creatures.push(creature);
     }
