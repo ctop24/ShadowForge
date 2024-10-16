@@ -47,12 +47,20 @@
     };
 
     window.addEventListener('keydown', (e) => {
-      if (keys.hasOwnProperty(e.key)) keys[e.key] = true;
+      if (e.code === 'Space') {
+        keys.Space = true;
+      } else if (keys.hasOwnProperty(e.key)) {
+        keys[e.key] = true;
+      }
       console.log('Key down:', e.key, keys);
     });
 
     window.addEventListener('keyup', (e) => {
-      if (keys.hasOwnProperty(e.key)) keys[e.key] = false;
+      if (e.code === 'Space') {
+        keys.Space = false;
+      } else if (keys.hasOwnProperty(e.key)) {
+        keys[e.key] = false;
+      }
       console.log('Key up:', e.key, keys);
     });
 
