@@ -47,35 +47,35 @@
     };
 
     window.addEventListener('keydown', (e) => {
-      if (e.code === 'Space') {
-        keys.Space = true;
-      } else if (keys.hasOwnProperty(e.key)) {
-        keys[e.key] = true;
-      }
-      console.log('Key down:', e.key, keys);
-    });
+  if (e.code === 'Space') {
+    keys.Space = true;
+    console.log('Space key pressed');
+  } else if (keys.hasOwnProperty(e.key)) {
+    keys[e.key] = true;
+  }
+});
 
     window.addEventListener('keyup', (e) => {
-      if (e.code === 'Space') {
-        keys.Space = false;
-      } else if (keys.hasOwnProperty(e.key)) {
-        keys[e.key] = false;
-      }
-      console.log('Key up:', e.key, keys);
-    });
+  if (e.code === 'Space') {
+    keys.Space = false;
+    console.log('Space key released');
+  } else if (keys.hasOwnProperty(e.key)) {
+    keys[e.key] = false;
+  }
+});
 
     // Game Loop
     function gameLoop() {
-      console.log('Game loop start');
+      
       update();
       draw();
       requestAnimationFrame(gameLoop);
-      console.log('Game loop end');
+      
     }
 
     // Update game state
     function update() {
-      console.log('Updating game state');
+      
 
       // Player movement
       if (keys.ArrowUp) player.y -= player.speed;
@@ -87,12 +87,12 @@
       player.x = Math.max(0, Math.min(canvas.width, player.x));
       player.y = Math.max(0, Math.min(canvas.height, player.y));
 
-      console.log('Player position:', player.x, player.y);
+      
 
       // Reduce damage cooldown
       if (player.damageCooldown > 0) {
         player.damageCooldown--;
-        console.log('Damage cooldown:', player.damageCooldown);
+        
       }
 
       // Check for collisions with creatures (damage player)
@@ -103,14 +103,14 @@
         const distance = Math.sqrt(dx * dx + dy * dy);
 
         if (distance < player.size + creature.size) {
-          console.log('Collision with creature:', creature);
+          
           if (player.damageCooldown === 0) {
             player.hp -= 10;
             player.damageCooldown = 60;
-            console.log('Player took damage. HP:', player.hp);
+            
             if (player.hp <= 0) {
               player.hp = 0;
-              console.log('Player HP is zero. Game over.');
+              
               alert("Game Over!");
               window.location.reload();
             }
@@ -127,7 +127,7 @@
 
         if (distance < player.size + ally.size && keys.Space && !ally.isFollowing) {
           ally.isFollowing = true;
-          console.log('Ally joined player:', ally);
+          
         }
       }
 
@@ -141,7 +141,7 @@
           if (distance > ally.size + player.size + 10) {
             ally.x += (dx / distance) * ally.speed;
             ally.y += (dy / distance) * ally.speed;
-            console.log('Ally following player. Position:', ally.x, ally.y);
+            
           }
         }
       });
@@ -175,7 +175,7 @@
       ctx.beginPath();
       ctx.arc(entity.x, entity.y, entity.size, 0, Math.PI * 2);
       ctx.fill();
-      console.log('Drawing entity at:', entity.x, entity.y, 'Color:', color);
+      
     }
 
     // Draw HP bar above character
@@ -191,7 +191,7 @@
       const hpWidth = (character.hp / character.maxHp) * barWidth;
       ctx.fillStyle = 'red';
       ctx.fillRect(barX, barY, hpWidth, barHeight);
-      console.log('Drawing HP bar for character at:', character.x, character.y, 'HP:', character.hp);
+      
     }
 
     // Draw player HP bar and numerical value in the top left corner
@@ -211,7 +211,7 @@
       ctx.fillStyle = 'white';
       ctx.font = '16px Arial';
       ctx.fillText(`${player.hp} / ${player.maxHp}`, barX + barWidth / 2 - 25, barY + barHeight - 5);
-      console.log('Drawing player HP display. HP:', player.hp, '/', player.maxHp);
+      
     }
 
     // Spawn creatures randomly
@@ -224,7 +224,7 @@
         maxHp: 50
       };
       creatures.push(creature);
-      console.log('Spawned creature at:', creature.x, creature.y);
+      
     }
 
     // Spawn allies randomly
@@ -239,7 +239,7 @@
         isFollowing: false
       };
       allies.push(ally);
-      console.log('Spawned ally at:', ally.x, ally.y);
+      
     }
 
     // Start the game loop
