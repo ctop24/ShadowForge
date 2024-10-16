@@ -111,6 +111,7 @@
       // Draw player
       drawEntity(player, player.damageCooldown > 0 ? 'darkblue' : 'blue');
       drawHpBar(player);
+      drawPlayerHpDisplay();
 
       // Draw creatures
       creatures.forEach(creature => {
@@ -148,6 +149,28 @@
       const hpWidth = (character.hp / character.maxHp) * barWidth;
       ctx.fillStyle = 'red';
       ctx.fillRect(barX, barY, hpWidth, barHeight);
+    }
+
+    // Draw player HP bar and numerical value in the top left corner
+    function drawPlayerHpDisplay() {
+      const barWidth = 200;
+      const barHeight = 20;
+      const barX = 20;
+      const barY = 20;
+
+      // Draw background bar (empty part)
+      ctx.fillStyle = 'gray';
+      ctx.fillRect(barX, barY, barWidth, barHeight);
+
+      // Draw filled part (current HP)
+      const hpWidth = (player.hp / player.maxHp) * barWidth;
+      ctx.fillStyle = 'red';
+      ctx.fillRect(barX, barY, hpWidth, barHeight);
+
+      // Draw numerical HP value
+      ctx.fillStyle = 'white';
+      ctx.font = '16px Arial';
+      ctx.fillText(`${player.hp} / ${player.maxHp}`, barX + barWidth / 2 - 25, barY + barHeight - 5);
     }
 
     // Spawn creatures randomly
