@@ -1,255 +1,1100 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Vampire Survivors Capture Game</title>
-  <style>
-    body {
-      margin: 0;
-      overflow: hidden;
-    }
-    canvas {
-      background-color: #222;
-    }
-  </style>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ShadowForge — A Britannia Idle Tale</title>
+<style>
+:root{
+  --gold:#c9a227; --gold-lt:#e8c65a;
+  --parch:#e9dab4; --parch-dk:#d8c497; --ink:#3a2c14;
+  --stone:#1b1712; --stone-lt:#262019; --stone-br:#4a3d2a;
+  --txt:#d8cfc0; --dim:#9a8f7d;
+  --hp:#a83232; --mana:#3a5fa8; --ok:#5d8a4a; --bad:#b0553a;
+}
+*{box-sizing:border-box}
+html,body{margin:0;padding:0}
+body{
+  background:#100d09 radial-gradient(ellipse at 50% -10%, #2a2216 0%, #100d09 60%);
+  color:var(--txt);
+  font:14px/1.45 "Segoe UI",system-ui,sans-serif;
+  min-height:100vh;
+}
+h1,h2,h3,.serif{font-family:Georgia,"Times New Roman",serif}
+button{font:inherit;cursor:pointer}
+.wrap{max-width:1280px;margin:0 auto;padding:10px 14px 40px}
+
+/* header */
+header{display:flex;align-items:center;gap:16px;flex-wrap:wrap;padding:10px 4px;border-bottom:2px solid var(--stone-br);margin-bottom:12px}
+header h1{margin:0;font-size:26px;color:var(--gold-lt);letter-spacing:1px;text-shadow:0 2px 6px #000}
+header h1 small{display:block;font-size:12px;color:var(--dim);letter-spacing:2px;font-weight:normal}
+.hdr-stat{background:var(--stone-lt);border:1px solid var(--stone-br);border-radius:6px;padding:4px 12px;text-align:center}
+.hdr-stat .lbl{font-size:10px;text-transform:uppercase;letter-spacing:1px;color:var(--dim)}
+.hdr-stat .val{font-size:16px;color:var(--gold-lt);font-family:Georgia,serif}
+.hdr-btns{margin-left:auto;display:flex;gap:6px}
+.btn{background:linear-gradient(#3a3125,#292219);border:1px solid var(--stone-br);color:var(--txt);border-radius:5px;padding:5px 12px}
+.btn:hover{border-color:var(--gold);color:var(--gold-lt)}
+.btn.danger:hover{border-color:var(--bad);color:#e08a6a}
+.btn:disabled{opacity:.4;cursor:not-allowed}
+
+/* layout */
+.cols{display:grid;grid-template-columns:270px 1fr 300px;gap:12px;align-items:start}
+@media(max-width:1050px){.cols{grid-template-columns:240px 1fr}.col-r{grid-column:1/-1;display:grid;grid-template-columns:1fr 1fr;gap:12px}}
+@media(max-width:720px){.cols{grid-template-columns:1fr}.col-r{grid-template-columns:1fr}}
+.panel{background:var(--stone-lt);border:1px solid var(--stone-br);border-radius:8px;padding:10px 12px;margin-bottom:12px;box-shadow:0 3px 10px rgba(0,0,0,.4)}
+.panel h2{margin:0 0 8px;font-size:15px;color:var(--gold-lt);border-bottom:1px solid var(--stone-br);padding-bottom:5px;letter-spacing:.5px}
+.panel h3{margin:10px 0 6px;font-size:13px;color:var(--gold)}
+
+/* skill gump — parchment like the classic UO skills window */
+.gump{background:linear-gradient(160deg,var(--parch),var(--parch-dk));border:2px solid #7a6540;color:var(--ink);border-radius:8px;padding:8px 10px;box-shadow:0 3px 10px rgba(0,0,0,.5), inset 0 0 30px rgba(122,101,64,.25)}
+.gump h2{color:#5a3f14;border-bottom:1px solid #b49b6c;margin:0 0 6px;padding-bottom:4px;font-size:15px}
+.gump .grp{font-size:10px;text-transform:uppercase;letter-spacing:1.5px;color:#7a6540;margin:7px 0 2px;border-bottom:1px dotted #b49b6c}
+.skrow{display:flex;align-items:baseline;gap:6px;padding:1px 2px;font-size:13px;border-radius:3px}
+.skrow:hover{background:rgba(122,101,64,.18)}
+.skrow .nm{flex:1;font-family:Georgia,serif;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.skrow .ttl{font-size:10px;color:#7a6540;white-space:nowrap}
+.skrow .vv{font-variant-numeric:tabular-nums;font-weight:bold;color:#33260e}
+.skrow .cp{font-size:10px;color:#8a7550;font-variant-numeric:tabular-nums}
+.skrow.capped .vv{color:#7a1f1f}
+.gump .totals{margin-top:8px;padding-top:5px;border-top:1px solid #b49b6c;font-size:12px;display:flex;justify-content:space-between;color:#5a3f14}
+.gump .totals b{font-variant-numeric:tabular-nums}
+
+/* bars */
+.bar{position:relative;height:16px;background:#0d0b08;border:1px solid var(--stone-br);border-radius:4px;overflow:hidden}
+.bar .fill{position:absolute;inset:0;width:0%;transition:width .2s linear}
+.bar.hp .fill{background:linear-gradient(#c65454,#8a2727)}
+.bar.mana .fill{background:linear-gradient(#5f83c9,#2a4685)}
+.bar.prog .fill{background:linear-gradient(#d9b84a,#96762a);transition:none}
+.bar.mon .fill{background:linear-gradient(#7fa85a,#4a6b2f)}
+.bar .txt{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:10px;color:#fff;text-shadow:0 1px 2px #000;font-variant-numeric:tabular-nums}
+
+/* character */
+.statline{display:flex;justify-content:space-between;padding:2px 0;font-size:13px}
+.statline b{color:var(--gold-lt);font-variant-numeric:tabular-nums}
+.equipbox{background:var(--stone);border:1px solid var(--stone-br);border-radius:5px;padding:6px 8px;margin:4px 0;font-size:12px}
+.equipbox .enm{color:var(--gold-lt);font-family:Georgia,serif}
+.exc{color:#7fd0e8}
+.bufftag{display:inline-block;background:#2a3a22;border:1px solid #4a6b2f;color:#a8d08a;border-radius:4px;font-size:11px;padding:1px 8px;margin:2px 2px 0 0}
+
+/* task bar */
+#taskPanel{border-color:var(--gold);border-width:1px}
+.taskhead{display:flex;align-items:center;gap:10px}
+.taskhead .tname{font-family:Georgia,serif;font-size:16px;color:var(--gold-lt);flex:1}
+#monRow{display:flex;align-items:center;gap:10px;margin-top:6px}
+#monRow .bar{flex:1}
+
+/* tabs */
+.tabs{display:flex;gap:4px;margin-bottom:10px;flex-wrap:wrap}
+.tab{background:var(--stone-lt);border:1px solid var(--stone-br);border-bottom:none;border-radius:6px 6px 0 0;padding:6px 16px;color:var(--dim);font-family:Georgia,serif}
+.tab.on{background:var(--stone-br);color:var(--gold-lt)}
+.tabbody{display:none}
+.tabbody.on{display:block}
+
+/* activity cards */
+.cardgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:8px}
+.card{background:var(--stone);border:1px solid var(--stone-br);border-radius:6px;padding:8px 10px;position:relative}
+.card:hover{border-color:var(--gold)}
+.card.locked{opacity:.45}
+.card.active{border-color:var(--gold);box-shadow:0 0 8px rgba(201,162,39,.35)}
+.card .cn{font-family:Georgia,serif;color:var(--gold-lt);font-size:14px}
+.card .cd{font-size:11px;color:var(--dim);margin:2px 0 6px}
+.card .req{font-size:10px;color:var(--bad)}
+.chip{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:5px;vertical-align:-1px;border:1px solid rgba(255,255,255,.25)}
+.gobtn{width:100%;margin-top:2px}
+
+.matsel{background:var(--stone);border:1px solid var(--stone-br);color:var(--txt);border-radius:4px;padding:4px 6px;font:inherit;margin:0 0 8px}
+
+/* inventory */
+.invrow{display:flex;align-items:center;gap:6px;padding:2px 0;font-size:12px;border-bottom:1px dotted #33291d}
+.invrow .inm{flex:1}
+.invrow .icnt{font-variant-numeric:tabular-nums;color:var(--gold-lt)}
+.invrow .sellb{font-size:10px;padding:1px 7px}
+
+/* shop */
+.shoprow{display:flex;align-items:center;gap:8px;padding:4px 0;border-bottom:1px dotted #33291d;font-size:13px}
+.shoprow .snm{flex:1}
+.shoprow .btn{font-size:11px;padding:2px 8px}
+
+/* log */
+#log{max-height:210px;overflow-y:auto;font-size:12px}
+#log p{margin:1px 0;color:var(--dim)}
+#log p.good{color:#a8d08a}
+#log p.skill{color:#8ab8d0}
+#log p.bad{color:#e08a6a}
+#log p.epic{color:var(--gold-lt);font-weight:bold}
+
+/* modal */
+.modalbg{position:fixed;inset:0;background:rgba(0,0,0,.75);display:none;align-items:center;justify-content:center;z-index:50}
+.modalbg.on{display:flex}
+.modal{background:linear-gradient(160deg,var(--parch),var(--parch-dk));color:var(--ink);border:3px solid #7a6540;border-radius:10px;max-width:460px;width:92%;padding:18px 22px;max-height:80vh;overflow-y:auto}
+.modal h2{margin:0 0 10px;color:#5a3f14}
+.modal ul{padding-left:20px;margin:8px 0}
+textarea#saveIO{width:100%;height:70px;background:var(--stone);color:var(--txt);border:1px solid var(--stone-br);border-radius:4px;font-size:11px;margin-top:8px}
+.muted{color:var(--dim);font-size:12px}
+</style>
 </head>
 <body>
-  <canvas id="gameCanvas"></canvas>
-  <script>
-    const canvas = document.getElementById('gameCanvas');
-    const ctx = canvas.getContext('2d');
+<div class="wrap">
+  <header>
+    <h1>ShadowForge<small>A BRITANNIA IDLE TALE</small></h1>
+    <div class="hdr-stat"><div class="lbl">Gold</div><div class="val" id="hGold">0</div></div>
+    <div class="hdr-stat"><div class="lbl">Total Skill</div><div class="val" id="hTotal">0.0</div></div>
+    <div class="hdr-stat"><div class="lbl">Kills</div><div class="val" id="hKills">0</div></div>
+    <div class="hdr-btns">
+      <button class="btn" data-act="save">Save</button>
+      <button class="btn" data-act="io">Export/Import</button>
+      <button class="btn danger" data-act="reset">Reset</button>
+    </div>
+  </header>
 
-    canvas.width = window.innerWidth;
-    canvas.height = window.innerHeight;
+  <div class="cols">
+    <!-- LEFT: skill gump -->
+    <aside>
+      <div class="gump">
+        <h2>Skills</h2>
+        <div id="skillsList"></div>
+        <div class="totals"><span>Total</span><b id="gTotal">0.0</b></div>
+        <div class="totals" style="border:none;margin-top:2px"><span class="muted" style="color:#7a6540">No 700-point cap in these lands.</span></div>
+      </div>
+    </aside>
 
-    // Game state variables
-    const player = {
-      x: canvas.width / 2,
-      y: canvas.height / 2,
-      speed: 5,
-      size: 20,
-      hp: 100,
-      maxHp: 100,
-      damageCooldown: 0
-    };
+    <!-- CENTER: task + tabs -->
+    <main>
+      <div class="panel" id="taskPanel">
+        <div class="taskhead">
+          <div class="tname" id="taskName">Idle</div>
+          <button class="btn" id="stopBtn" data-act="stop" style="display:none">Stop</button>
+        </div>
+        <div class="bar prog" style="margin-top:6px"><div class="fill" id="taskFill"></div><div class="txt" id="taskTxt"></div></div>
+        <div id="monRow" style="display:none">
+          <span id="monName" class="serif" style="color:var(--gold-lt)"></span>
+          <div class="bar mon"><div class="fill" id="monFill"></div><div class="txt" id="monTxt"></div></div>
+        </div>
+      </div>
 
-    const creatures = [];
-    const allies = [];
+      <div class="tabs">
+        <button class="tab on" data-act="tab" data-tab="gather">Gathering</button>
+        <button class="tab" data-act="tab" data-tab="combat">Hunting</button>
+        <button class="tab" data-act="tab" data-tab="craft">Crafting</button>
+        <button class="tab" data-act="tab" data-tab="magic">Magic &amp; Roguery</button>
+        <button class="tab" data-act="tab" data-tab="shop">Provisioner</button>
+      </div>
+      <div class="tabbody on panel" id="tab-gather"></div>
+      <div class="tabbody panel" id="tab-combat"></div>
+      <div class="tabbody panel" id="tab-craft"></div>
+      <div class="tabbody panel" id="tab-magic"></div>
+      <div class="tabbody panel" id="tab-shop"></div>
 
-    // Controls
-    const keys = {
-      ArrowUp: false,
-      ArrowDown: false,
-      ArrowLeft: false,
-      ArrowRight: false,
-      Space: false // Request ally action
-    };
+      <div class="panel"><h2>Journal</h2><div id="log"></div></div>
+    </main>
 
-    window.addEventListener('keydown', (e) => {
-  if (e.code === 'Space') {
-    keys.Space = true;
-    console.log('Space key pressed');
-  } else if (keys.hasOwnProperty(e.key)) {
-    keys[e.key] = true;
-  }
+    <!-- RIGHT: character + inventory -->
+    <aside class="col-r">
+      <div class="panel">
+        <h2 id="charName">The Avatar</h2>
+        <div class="bar hp"><div class="fill" id="hpFill"></div><div class="txt" id="hpTxt"></div></div>
+        <div style="height:5px"></div>
+        <div class="bar mana"><div class="fill" id="manaFill"></div><div class="txt" id="manaTxt"></div></div>
+        <div style="height:8px"></div>
+        <div class="statline"><span>Strength</span><b id="sStr">0</b></div>
+        <div class="statline"><span>Dexterity</span><b id="sDex">0</b></div>
+        <div class="statline"><span>Intelligence</span><b id="sInt">0</b></div>
+        <h3>Equipment</h3>
+        <div class="equipbox" id="eqWeapon"></div>
+        <div class="equipbox" id="eqArmor"></div>
+        <div id="buffs"></div>
+      </div>
+      <div class="panel">
+        <h2>Backpack</h2>
+        <div id="invList"><p class="muted">Empty.</p></div>
+      </div>
+    </aside>
+  </div>
+</div>
+
+<!-- offline modal -->
+<div class="modalbg" id="offlineModal">
+  <div class="modal">
+    <h2>Welcome back to Britannia</h2>
+    <div id="offlineBody"></div>
+    <button class="btn" data-act="closeModal" style="margin-top:12px;color:#3a2c14;background:#c9b98a;border-color:#7a6540">Continue</button>
+  </div>
+</div>
+<!-- export/import modal -->
+<div class="modalbg" id="ioModal">
+  <div class="modal">
+    <h2>Export / Import Save</h2>
+    <p class="muted" style="color:#5a3f14">Copy this text to back up thy progress, or paste a save and press Import.</p>
+    <textarea id="saveIO"></textarea>
+    <div style="margin-top:10px;display:flex;gap:8px">
+      <button class="btn" data-act="doImport">Import</button>
+      <button class="btn" data-act="closeModal">Close</button>
+    </div>
+  </div>
+</div>
+
+<script>
+'use strict';
+/* =============== helpers =============== */
+const $=s=>document.querySelector(s);
+const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
+const rnd=(a,b)=>a+Math.random()*(b-a);
+const rndi=(a,b)=>Math.floor(a+Math.random()*(b-a+1));
+const fmt1=n=>(Math.round(n*10)/10).toFixed(1);
+const fmtN=n=>{n=Math.floor(n);return n>=1e6?(n/1e6).toFixed(2)+'M':n>=1e4?(n/1e3).toFixed(1)+'K':n.toLocaleString('en-US');};
+
+/* =============== static data =============== */
+const SKILL_DEFS=[
+  {key:'mining',name:'Mining',stat:'str',grp:'Gathering'},
+  {key:'lumberjacking',name:'Lumberjacking',stat:'str',grp:'Gathering'},
+  {key:'fishing',name:'Fishing',stat:'dex',grp:'Gathering'},
+  {key:'blacksmithy',name:'Blacksmithy',stat:'str',grp:'Crafting'},
+  {key:'carpentry',name:'Carpentry',stat:'str',grp:'Crafting'},
+  {key:'tailoring',name:'Tailoring',stat:'dex',grp:'Crafting'},
+  {key:'cooking',name:'Cooking',stat:'int',grp:'Crafting'},
+  {key:'alchemy',name:'Alchemy',stat:'int',grp:'Crafting'},
+  {key:'swords',name:'Swordsmanship',stat:'str',grp:'Combat'},
+  {key:'tactics',name:'Tactics',stat:'str',grp:'Combat'},
+  {key:'anatomy',name:'Anatomy',stat:'int',grp:'Combat'},
+  {key:'healing',name:'Healing',stat:'int',grp:'Combat'},
+  {key:'magery',name:'Magery',stat:'int',grp:'Magic'},
+  {key:'evalint',name:'Evaluating Intelligence',stat:'int',grp:'Magic'},
+  {key:'meditation',name:'Meditation',stat:'int',grp:'Magic'},
+  {key:'hiding',name:'Hiding',stat:'dex',grp:'Roguery'},
+  {key:'stealth',name:'Stealth',stat:'dex',grp:'Roguery'},
+];
+const SKILL_BY={}; SKILL_DEFS.forEach(d=>SKILL_BY[d.key]=d);
+const TITLES=[[120,'Legendary'],[110,'Elder'],[100,'Grandmaster'],[90,'Master'],[80,'Adept'],[70,'Expert'],[60,'Journeyman'],[50,'Apprentice'],[40,'Novice'],[30,'Neophyte']];
+function titleFor(v){for(const [t,n] of TITLES) if(v>=t) return n; return '';}
+
+const ORES=[
+  {key:'iron',name:'Iron',min:0,color:'#8a8a8a',sell:2},
+  {key:'dull',name:'Dull Copper',min:65,color:'#a67c52',sell:7},
+  {key:'shadow',name:'Shadow Iron',min:70,color:'#5a5a72',sell:10},
+  {key:'copper',name:'Copper',min:75,color:'#b87333',sell:14},
+  {key:'bronze',name:'Bronze',min:80,color:'#8c6d31',sell:19},
+  {key:'golden',name:'Golden',min:85,color:'#d4af37',sell:26},
+  {key:'agapite',name:'Agapite',min:90,color:'#c07862',sell:34},
+  {key:'verite',name:'Verite',min:95,color:'#4f7942',sell:45},
+  {key:'valorite',name:'Valorite',min:99,color:'#4682b4',sell:60},
+];
+const WOODS=[
+  {key:'plain',name:'Plain',min:0,color:'#8a6a45',sell:2},
+  {key:'oak',name:'Oak',min:65,color:'#b09055',sell:8},
+  {key:'ash',name:'Ash',min:75,color:'#c8c0a8',sell:13},
+  {key:'yew',name:'Yew',min:85,color:'#7a8a4a',sell:20},
+  {key:'heartwood',name:'Heartwood',min:90,color:'#c05a3a',sell:28},
+  {key:'bloodwood',name:'Bloodwood',min:95,color:'#8a2020',sell:38},
+  {key:'frostwood',name:'Frostwood',min:99,color:'#9ac8e0',sell:55},
+];
+const FISHES=[
+  {key:'fish',name:'Fish',min:0,sell:3,steaks:1},
+  {key:'large_fish',name:'Large Fish',min:45,sell:9,steaks:2},
+  {key:'prized_fish',name:'Prized Fish',min:70,sell:18,steaks:4},
+  {key:'rare_fish',name:'Rare Fish',min:90,sell:34,steaks:7},
+];
+const GATHERS=[
+  {skill:'mining',verb:'Mine',place:'the caves near Minoc',time:2.5,tiers:ORES,res:o=>o.key+'_ingot',resName:o=>o.name+' Ingot'},
+  {skill:'lumberjacking',verb:'Chop',place:'the woods of Yew',time:3.0,tiers:WOODS,res:w=>w.key+'_board',resName:w=>w.name+' Board'},
+  {skill:'fishing',verb:'Fish for',place:'the docks of Trinsic',time:4.0,tiers:FISHES,res:f=>'raw_'+f.key,resName:f=>'Raw '+f.name},
+];
+
+const SPELLS=[
+  {name:'Magic Arrow',min:0,dmg:9,mana:4},
+  {name:'Harm',min:15,dmg:14,mana:6},
+  {name:'Fireball',min:30,dmg:20,mana:9},
+  {name:'Lightning',min:50,dmg:28,mana:11},
+  {name:'Energy Bolt',min:70,dmg:40,mana:14},
+  {name:'Flamestrike',min:90,dmg:58,mana:20},
+];
+
+const MONSTERS=[
+  {key:'mongbat',name:'Mongbat',hp:25,dmg:4,diff:10,gold:[4,12]},
+  {key:'hart',name:'Great Hart',hp:45,dmg:6,diff:20,gold:[0,4],drops:{hides:[3,6]}},
+  {key:'skeleton',name:'Skeleton',hp:55,dmg:8,diff:30,gold:[15,30]},
+  {key:'orc',name:'Orc',hp:80,dmg:10,diff:40,gold:[25,50]},
+  {key:'bear',name:'Grizzly Bear',hp:100,dmg:12,diff:45,gold:[0,6],drops:{hides:[6,12]}},
+  {key:'ettin',name:'Ettin',hp:160,dmg:15,diff:55,gold:[60,110]},
+  {key:'troll',name:'Troll',hp:200,dmg:17,diff:60,gold:[80,140]},
+  {key:'ogre',name:'Ogre',hp:240,dmg:19,diff:65,gold:[100,180]},
+  {key:'lich',name:'Lich',hp:320,dmg:24,diff:75,gold:[180,320]},
+  {key:'drake',name:'Drake',hp:400,dmg:28,diff:82,gold:[250,400],drops:{hides:[8,15]}},
+  {key:'dragon',name:'Dragon',hp:650,dmg:34,diff:92,gold:[450,800],drops:{hides:[15,25]},ps:0.04},
+  {key:'wyrm',name:'Ancient Wyrm',hp:1300,dmg:48,diff:105,gold:[900,1500],drops:{hides:[25,40]},ps:0.10},
+  {key:'balron',name:'Balron',hp:1600,dmg:55,diff:112,gold:[1200,2000],ps:0.14},
+];
+const MON_BY={}; MONSTERS.forEach(m=>MON_BY[m.key]=m);
+
+/* resources: name + base sell price */
+const RESOURCES={};
+ORES.forEach(o=>RESOURCES[o.key+'_ingot']={name:o.name+' Ingot',sell:o.sell,color:o.color});
+WOODS.forEach(w=>RESOURCES[w.key+'_board']={name:w.name+' Board',sell:w.sell,color:w.color});
+FISHES.forEach(f=>RESOURCES['raw_'+f.key]={name:'Raw '+f.name,sell:f.sell});
+Object.assign(RESOURCES,{
+  hides:{name:'Hides',sell:4},
+  cloth:{name:'Cloth',sell:1},
+  reagents:{name:'Reagents',sell:1},
+  bandage:{name:'Bandages',sell:2},
+  fish_steak:{name:'Fish Steaks',sell:5},
+  lesser_heal_potion:{name:'Lesser Heal Potion',sell:8},
+  heal_potion:{name:'Heal Potion',sell:18},
+  greater_heal_potion:{name:'Greater Heal Potion',sell:35},
 });
 
-    window.addEventListener('keyup', (e) => {
-  if (e.code === 'Space') {
-    keys.Space = false;
-    console.log('Space key released');
-  } else if (keys.hasOwnProperty(e.key)) {
-    keys[e.key] = false;
+/* recipes */
+const RECIPES=[
+  /* blacksmithy — weapons (material = any ingot) */
+  {id:'dagger',skill:'blacksmithy',name:'Dagger',min:0,mat:'ingot',qty:2,kind:'weapon',dmg:6},
+  {id:'cutlass',skill:'blacksmithy',name:'Cutlass',min:20,mat:'ingot',qty:4,kind:'weapon',dmg:9},
+  {id:'longsword',skill:'blacksmithy',name:'Longsword',min:35,mat:'ingot',qty:6,kind:'weapon',dmg:12},
+  {id:'katana',skill:'blacksmithy',name:'Katana',min:55,mat:'ingot',qty:8,kind:'weapon',dmg:14},
+  {id:'halberd',skill:'blacksmithy',name:'Halberd',min:70,mat:'ingot',qty:10,kind:'weapon',dmg:17},
+  /* blacksmithy — armor */
+  {id:'ringmail',skill:'blacksmithy',name:'Ringmail Suit',min:20,mat:'ingot',qty:8,kind:'armor',ar:8},
+  {id:'chainmail',skill:'blacksmithy',name:'Chainmail Suit',min:45,mat:'ingot',qty:12,kind:'armor',ar:12},
+  {id:'platemail',skill:'blacksmithy',name:'Platemail Suit',min:65,mat:'ingot',qty:18,kind:'armor',ar:18},
+  /* carpentry — sell goods (material = any board) */
+  {id:'stool',skill:'carpentry',name:'Foot Stool',min:0,mat:'board',qty:3,kind:'sell'},
+  {id:'chair',skill:'carpentry',name:'Fancy Chair',min:25,mat:'board',qty:5,kind:'sell'},
+  {id:'table',skill:'carpentry',name:'Writing Table',min:45,mat:'board',qty:8,kind:'sell'},
+  {id:'bookcase',skill:'carpentry',name:'Full Bookcase',min:65,mat:'board',qty:12,kind:'sell'},
+  {id:'throne',skill:'carpentry',name:'Throne',min:85,mat:'board',qty:16,kind:'sell'},
+  /* tailoring */
+  {id:'dress',skill:'tailoring',name:'Fancy Dress',min:0,mat:'cloth',qty:6,kind:'sell'},
+  {id:'leather',skill:'tailoring',name:'Leather Suit',min:15,mat:'hides',qty:8,kind:'armor',ar:6},
+  {id:'studded',skill:'tailoring',name:'Studded Suit',min:40,mat:'hides',qty:12,kind:'armor',ar:9},
+  {id:'robe',skill:'tailoring',name:'Embroidered Robe',min:60,mat:'cloth',qty:10,kind:'sell'},
+  /* alchemy */
+  {id:'lheal',skill:'alchemy',name:'Lesser Heal Potion',min:0,mat:'reagents',qty:3,kind:'item',out:'lesser_heal_potion'},
+  {id:'heal',skill:'alchemy',name:'Heal Potion',min:35,mat:'reagents',qty:5,kind:'item',out:'heal_potion'},
+  {id:'gheal',skill:'alchemy',name:'Greater Heal Potion',min:65,mat:'reagents',qty:8,kind:'item',out:'greater_heal_potion'},
+];
+/* cooking recipes generated from fish tiers */
+FISHES.forEach(f=>RECIPES.push({id:'cook_'+f.key,skill:'cooking',name:'Cook '+f.name,min:f.min,mat:'raw_'+f.key,qty:1,kind:'item',out:'fish_steak',outQty:f.steaks}));
+const RECIPE_BY={}; RECIPES.forEach(r=>RECIPE_BY[r.id]=r);
+
+const SHOP=[
+  {key:'bandage',name:'Bandages',cost:4},
+  {key:'cloth',name:'Cloth',cost:3},
+  {key:'reagents',name:'Reagents',cost:2},
+];
+
+const POTIONS=[['greater_heal_potion',50],['heal_potion',30],['lesser_heal_potion',15]];
+
+/* =============== state =============== */
+const SAVE_KEY='shadowforge-uo-idle-v1';
+let state=null;
+function freshState(){
+  const s={
+    ver:1, gold:100, kills:0,
+    stats:{str:25,dex:25,int:25},
+    hp:55, mana:35,
+    skills:{}, inv:{bandage:20},
+    equip:{
+      weapon:{name:'Rusty Sword',dmg:5,tier:0,exc:false},
+      armor:{name:'Ragged Tunic',ar:1,tier:0,exc:false},
+    },
+    task:null, combatStyle:'melee', lastCombat:null, deaths:0,
+    craftMat:{ingot:'iron',board:'plain'},
+    wellFed:0, bandCd:0, potCd:0, deadFor:-1,
+    lastSeen:Date.now(),
+  };
+  SKILL_DEFS.forEach(d=>s.skills[d.key]={v:0,cap:100});
+  return s;
+}
+const derived={maxHp:0,maxMana:0};
+function recalcDerived(){
+  derived.maxHp=30+state.stats.str;
+  derived.maxMana=10+state.stats.int;
+  state.hp=clamp(state.hp,0,derived.maxHp);
+  state.mana=clamp(state.mana,0,derived.maxMana);
+}
+function totalSkill(){return SKILL_DEFS.reduce((a,d)=>a+state.skills[d.key].v,0);}
+
+/* =============== journal =============== */
+let quiet=false;
+function log(msg,cls){
+  if(quiet) return;
+  const el=$('#log');
+  const p=document.createElement('p');
+  if(cls) p.className=cls;
+  p.textContent=msg;
+  el.prepend(p);
+  while(el.children.length>70) el.lastChild.remove();
+}
+
+/* =============== skill system (UO-style gains) =============== */
+function successChance(skill,min){return clamp(0.5+(skill-min)*0.02,0.15,1);}
+function tryGain(key,diff,mult){
+  mult=mult||1;
+  const s=state.skills[key];
+  if(s.v>=s.cap) return false;
+  const delta=s.v-diff;
+  if(delta<-25) return false;                 // too difficult to learn from
+  let ch = delta>50 ? 0.02 : 0.45-delta*0.008; // harder = better gains
+  ch *= (1-(s.v/(s.cap+10))*0.72);            // slower near the cap
+  ch *= mult;
+  if(Math.random()>=ch) return false;
+  s.v=Math.min(s.cap,Math.round((s.v+0.1)*10)/10);
+  const whole=Math.round(s.v*10)%10===0;
+  if(whole) log(`Your ${SKILL_BY[key].name} skill has increased to ${fmt1(s.v)}.`,'skill');
+  if(whole&&titleFor(s.v)&&titleFor(s.v)!==titleFor(s.v-1))
+    log(`Thou art now a ${titleFor(s.v)} of ${SKILL_BY[key].name}!`,'epic');
+  // UO-style stat gain by use
+  const st=SKILL_BY[key].stat;
+  if(state.stats[st]<100&&Math.random()<0.22*(1-state.stats[st]/105)){
+    state.stats[st]++;recalcDerived();
+    if(state.stats[st]%5===0) log(`Thy ${st==='str'?'Strength':st==='dex'?'Dexterity':'Intelligence'} has risen to ${state.stats[st]}.`,'skill');
   }
+  return true;
+}
+function applyPowerScroll(){
+  let pool=SKILL_DEFS.filter(d=>{const s=state.skills[d.key];return s.cap<120&&s.v>=s.cap-2;});
+  if(!pool.length) pool=SKILL_DEFS.filter(d=>state.skills[d.key].cap<120);
+  if(!pool.length) return;
+  const d=pool[rndi(0,pool.length-1)];
+  state.skills[d.key].cap+=5;
+  log(`A Power Scroll of ${d.name}! Thy cap is now ${state.skills[d.key].cap}.`,'epic');
+}
+
+/* =============== inventory / economy =============== */
+function addInv(key,n){state.inv[key]=(state.inv[key]||0)+n; if(state.inv[key]<=0) delete state.inv[key]; invDirty=true;}
+function invCount(key){return state.inv[key]||0;}
+function sellAll(key){
+  const n=invCount(key); if(!n) return;
+  const g=n*RESOURCES[key].sell;
+  addInv(key,-n); state.gold+=g;
+  log(`Sold ${n} × ${RESOURCES[key].name} for ${fmtN(g)}gp.`,'good');
+  renderTabs();
+}
+
+/* =============== tasks =============== */
+function startTask(t){
+  if(state.deadFor>=0){log('Thou art dead. Wait for resurrection.','bad');return;}
+  state.task=t; t.acc=0;
+  if(t.kind==='combat'){const m=MON_BY[t.monster]; t.monHp=m.hp; log(`You attack ${aOrAn(m.name)}!`);}
+  renderTabs(); renderTask();
+}
+function stopTask(msg){
+  state.task=null;
+  if(msg) log(msg);
+  renderTabs(); renderTask();
+}
+function aOrAn(n){return (/^[aeiou]/i.test(n)?'an ':'a ')+n;}
+
+function taskDuration(t){
+  if(t.kind==='gather') return GATHERS.find(g=>g.skill===t.skill).time;
+  if(t.kind==='combat') return state.combatStyle==='magery'?2.5:clamp(3.2-state.stats.dex*0.012,1.8,3.2);
+  if(t.kind==='craft') return 3.0;
+  if(t.kind==='train') return 3.0;
+  return 3.0;
+}
+function taskLabel(t){
+  if(!t) return 'Idle';
+  if(t.kind==='gather'){const g=GATHERS.find(x=>x.skill===t.skill);const tier=g.tiers[t.tier];return `${g.verb} ${tier.name}${t.skill==='mining'?' Ore':''} — ${g.place}`;}
+  if(t.kind==='combat') return `Fighting: ${MON_BY[t.monster].name}`;
+  if(t.kind==='craft'){const r=RECIPE_BY[t.recipe];return `Crafting: ${r.name}`;}
+  if(t.kind==='train'){
+    if(t.skill==='meditation') return 'Meditating…';
+    if(t.skill==='hiding') return 'Hiding in the shadows…';
+    return 'Sneaking through the streets…';
+  }
+  return '…';
+}
+
+/* ---- gather action ---- */
+function doGather(t){
+  const g=GATHERS.find(x=>x.skill===t.skill);
+  const tier=g.tiers[t.tier];
+  const sk=state.skills[t.skill].v;
+  if(sk<tier.min){stopTask('Thou canst not harvest that yet.');return;}
+  tryGain(t.skill,tier.min);
+  if(Math.random()<successChance(sk,tier.min)){
+    addInv(g.res(tier),1);
+  }
+}
+
+/* ---- combat action (one round) ---- */
+function playerWeaponDmg(){
+  const w=state.equip.weapon;
+  return w.dmg*(0.5+state.skills.swords.v/125)*(0.8+state.skills.tactics.v/200)*(1+state.stats.str/400)*(1+state.skills.anatomy.v/300);
+}
+function pickSpell(){
+  const mg=state.skills.magery.v;
+  for(let i=SPELLS.length-1;i>=0;i--){
+    if(mg>=SPELLS[i].min&&state.mana>=SPELLS[i].mana) return SPELLS[i];
+  }
+  return null;
+}
+function doCombat(t,roundTime){
+  const m=MON_BY[t.monster];
+  // -- player attack --
+  let castedSpell=false;
+  if(state.combatStyle==='magery'){
+    const sp=pickSpell();
+    if(sp){
+      state.mana-=sp.mana;
+      const dmg=sp.dmg*(0.5+state.skills.magery.v/200)*(1+state.skills.evalint.v/150)*rnd(0.85,1.15);
+      t.monHp-=dmg;
+      tryGain('magery',Math.min(sp.min+20,m.diff+15));
+      tryGain('evalint',m.diff,0.5);
+      castedSpell=true;
+    }
+  }
+  if(!castedSpell){
+    const hitCh=clamp(0.60+(state.skills.swords.v-m.diff)*0.012,0.25,0.95);
+    if(Math.random()<hitCh) t.monHp-=playerWeaponDmg()*rnd(0.85,1.15);
+    tryGain('swords',m.diff);
+    tryGain('tactics',m.diff,0.6);
+    tryGain('anatomy',m.diff,0.35);
+  }
+  // -- monster slain? --
+  if(t.monHp<=0){
+    state.kills++; state.deaths=0;
+    const g=rndi(m.gold[0],m.gold[1]);
+    state.gold+=g;
+    let msg=`You have slain ${aOrAn(m.name)}! (+${g}gp`;
+    if(m.drops) for(const [k,range] of Object.entries(m.drops)){const n=rndi(range[0],range[1]);addInv(k,n);msg+=`, +${n} ${RESOURCES[k].name}`;}
+    msg+=')';
+    log(msg,'good');
+    if(m.ps&&Math.random()<m.ps) applyPowerScroll();
+    t.monHp=m.hp; // next one wanders in
+    return;
+  }
+  // -- monster attacks (normalized dps so swing speed is fair) --
+  const dodge=clamp((state.skills.hiding.v+state.skills.stealth.v)/1000+state.stats.dex/1500,0,0.35);
+  if(Math.random()>=dodge){
+    const ar=state.equip.armor.ar;
+    const dmg=(m.dmg/3.0)*roundTime*(1-ar/(ar+50))*rnd(0.8,1.2);
+    state.hp-=dmg;
+  }
+  // -- auto healing --
+  if(state.hp<derived.maxHp*0.5&&state.potCd<=0){
+    for(const [pk,heal] of POTIONS){
+      if(invCount(pk)>0){addInv(pk,-1);state.hp=Math.min(derived.maxHp,state.hp+heal);state.potCd=15;break;}
+    }
+  }
+  if(state.hp<derived.maxHp*0.75&&state.bandCd<=0&&invCount('bandage')>0){
+    addInv('bandage',-1);
+    const heal=12+state.skills.healing.v*0.5+state.skills.anatomy.v*0.15;
+    state.hp=Math.min(derived.maxHp,state.hp+heal);
+    state.bandCd=8;
+    tryGain('healing',Math.min(m.diff,state.skills.healing.v+15),0.8);
+    tryGain('anatomy',m.diff,0.3);
+  }
+  // -- death --
+  if(state.hp<=0){
+    const lost=Math.floor(state.gold*0.10);
+    state.gold-=lost;
+    state.hp=0; state.deadFor=0; state.task=null;
+    state.lastCombat=t.monster; state.deaths=(state.deaths||0)+1;
+    log(`Thou art dead! A wandering healer will resurrect thee shortly. (-${fmtN(lost)}gp)`,'bad');
+    renderTabs();
+  }
+}
+
+/* ---- craft action ---- */
+function craftMatKey(r){
+  if(r.mat==='ingot') return state.craftMat.ingot+'_ingot';
+  if(r.mat==='board') return state.craftMat.board+'_board';
+  return r.mat;
+}
+function craftTier(r){
+  if(r.mat==='ingot') return ORES.findIndex(o=>o.key===state.craftMat.ingot);
+  if(r.mat==='board') return WOODS.findIndex(w=>w.key===state.craftMat.board);
+  return 0;
+}
+function doCraft(t){
+  const r=RECIPE_BY[t.recipe];
+  const matKey=craftMatKey(r);
+  if(invCount(matKey)<r.qty){stopTask(`Out of ${RESOURCES[matKey].name}s — crafting halted.`);return;}
+  const tier=craftTier(r);
+  const effMin=r.min+tier*3;
+  const sk=state.skills[r.skill].v;
+  if(sk<effMin){stopTask('That work is beyond thy skill.');return;}
+  tryGain(r.skill,effMin);
+  if(Math.random()>=successChance(sk,effMin)){
+    addInv(matKey,-Math.ceil(r.qty/2)); // failures waste half the material
+    return;
+  }
+  addInv(matKey,-r.qty);
+  const exc=Math.random()<clamp((sk-effMin)/200+0.05,0,0.5);
+  const matName=r.mat==='ingot'?ORES[tier].name:r.mat==='board'?WOODS[tier].name:null;
+  const itemName=(exc?'Exceptional ':'')+(matName&&tier>0?matName+' ':'')+r.name;
+  const value=Math.floor((r.min+8)*(1+tier*0.7)*(exc?1.75:1));
+  if(r.kind==='weapon'||r.kind==='armor'){
+    const item=r.kind==='weapon'
+      ?{name:itemName,dmg:Math.round(r.dmg+tier*1.5+(exc?2:0)),tier,exc}
+      :{name:itemName,ar:Math.round(r.ar+tier*1.2+(exc?2:0)),tier,exc};
+    const slot=r.kind;
+    const cur=state.equip[slot];
+    const better=r.kind==='weapon'?item.dmg>cur.dmg:item.ar>cur.ar;
+    if(better){state.equip[slot]=item;log(`You crafted ${aOrAn(itemName)} and equip it!`,'good');}
+    else{state.gold+=value;}
+  }else if(r.kind==='item'){
+    addInv(r.out,r.outQty||1);
+  }else{ // sell
+    state.gold+=value;
+  }
+}
+
+/* ---- training tasks (meditation / hiding / stealth) ---- */
+function doTrain(t){
+  const sk=state.skills[t.skill];
+  if(t.skill==='stealth'&&state.skills.hiding.v<30){stopTask('Thou must learn Hiding (30) before Stealth.');return;}
+  tryGain(t.skill,Math.max(0,sk.v-12));
+  if(t.skill==='meditation') state.mana=Math.min(derived.maxMana,state.mana+3+sk.v/25);
+  if(t.skill==='stealth'&&Math.random()<0.25){const g=rndi(1,3+Math.floor(sk.v/10));state.gold+=g;}
+}
+
+/* =============== game loop =============== */
+function performAction(t,dur){
+  if(t.kind==='gather') doGather(t);
+  else if(t.kind==='combat') doCombat(t,dur);
+  else if(t.kind==='craft') doCraft(t);
+  else if(t.kind==='train') doTrain(t);
+}
+function advance(dt){
+  // timers
+  state.bandCd=Math.max(0,state.bandCd-dt);
+  state.potCd=Math.max(0,state.potCd-dt);
+  // death / resurrection
+  if(state.deadFor>=0){
+    state.deadFor+=dt;
+    if(state.deadFor>=20){
+      state.deadFor=-1;state.hp=Math.floor(derived.maxHp*0.5);
+      log('The healer resurrects thee. "Be more careful, milord."');
+      if(state.lastCombat&&!state.task){
+        if((state.deaths||0)<3){
+          state.task={kind:'combat',monster:state.lastCombat,acc:0,monHp:MON_BY[state.lastCombat].hp};
+          log('You steel yourself and return to the fight!');
+        }else{
+          log('Thrice slain! Thou art outmatched — seek easier prey, better gear, or more bandages.','bad');
+          state.lastCombat=null; state.deaths=0;
+        }
+      }
+    }
+  }
+  // well fed
+  if(state.wellFed>0) state.wellFed=Math.max(0,state.wellFed-dt);
+  else if(invCount('fish_steak')>0){addInv('fish_steak',-1);state.wellFed=600;log('You eat a fish steak. You feel well fed.');}
+  // regen
+  const inCombat=state.task&&state.task.kind==='combat';
+  if(state.deadFor<0){
+    const fedMult=state.wellFed>0?1.6:1;
+    state.hp=Math.min(derived.maxHp,state.hp+(0.4+state.stats.str/150)*fedMult*(inCombat?0.25:1)*dt);
+    const medMult=(state.task&&state.task.kind==='train'&&state.task.skill==='meditation')?3:1;
+    state.mana=Math.min(derived.maxMana,state.mana+(0.25+state.skills.meditation.v/35)*medMult*dt);
+  }
+  // active task
+  const t=state.task;
+  if(!t) return;
+  t.acc=(t.acc||0)+dt;
+  let guard=0;
+  while(state.task===t){
+    const dur=taskDuration(t);
+    if(t.acc<dur) break;
+    t.acc-=dur;
+    performAction(t,dur);
+    if(++guard>200000) {t.acc=0;break;}
+  }
+}
+function simulate(seconds){
+  // chunked catch-up so per-round combat/regen interleave sanely
+  let left=seconds, guard=0;
+  while(left>0&&guard<400000){
+    const step=Math.min(left,1.5);
+    advance(step); left-=step; guard++;
+  }
+}
+
+let lastFrame=Date.now();
+function tick(){
+  const now=Date.now();
+  let dt=(now-lastFrame)/1000;
+  lastFrame=now;
+  if(dt<0) dt=0;
+  if(dt>5){simulate(Math.min(dt,36000));}
+  else advance(dt);
+  state.lastSeen=now;
+  renderLive();
+}
+
+/* =============== offline progress =============== */
+function offlineCatchup(){
+  const away=Math.floor((Date.now()-state.lastSeen)/1000);
+  if(away<60) return;
+  const capped=Math.min(away,36000); // 10 hours
+  const before={
+    gold:state.gold,kills:state.kills,
+    skills:Object.fromEntries(SKILL_DEFS.map(d=>[d.key,state.skills[d.key].v])),
+    inv:{...state.inv},
+  };
+  quiet=true;
+  simulate(capped);
+  quiet=false;
+  state.lastSeen=Date.now();
+  // build summary
+  const lines=[];
+  const dg=state.gold-before.gold;
+  if(dg) lines.push(`<li>${dg>0?'Earned':'Lost'} <b>${fmtN(Math.abs(dg))}gp</b></li>`);
+  const dk=state.kills-before.kills;
+  if(dk) lines.push(`<li>Slew <b>${fmtN(dk)}</b> monsters</li>`);
+  SKILL_DEFS.forEach(d=>{
+    const dv=state.skills[d.key].v-before.skills[d.key];
+    if(dv>0.05) lines.push(`<li>${d.name}: +<b>${fmt1(dv)}</b> (now ${fmt1(state.skills[d.key].v)})</li>`);
+  });
+  const keys=new Set([...Object.keys(before.inv),...Object.keys(state.inv)]);
+  keys.forEach(k=>{
+    const dv=(state.inv[k]||0)-(before.inv[k]||0);
+    if(dv>0) lines.push(`<li>Gathered <b>${fmtN(dv)}</b> × ${RESOURCES[k].name}</li>`);
+  });
+  const h=Math.floor(capped/3600),mn=Math.floor((capped%3600)/60);
+  $('#offlineBody').innerHTML=
+    `<p>Whilst thou wert away (${h?h+'h ':''}${mn}m${away>capped?' — 10h cap':''}):</p>`+
+    (lines.length?`<ul>${lines.join('')}</ul>`:'<p>…nothing happened. Set a task before thou leavest!</p>');
+  $('#offlineModal').classList.add('on');
+}
+
+/* =============== save / load =============== */
+function save(){state.lastSeen=Date.now();localStorage.setItem(SAVE_KEY,JSON.stringify(state));}
+function load(){
+  try{
+    const raw=localStorage.getItem(SAVE_KEY);
+    if(!raw) return false;
+    const s=JSON.parse(raw);
+    if(!s||!s.skills) return false;
+    state=Object.assign(freshState(),s);
+    SKILL_DEFS.forEach(d=>{if(!state.skills[d.key])state.skills[d.key]={v:0,cap:100};});
+    return true;
+  }catch(e){return false;}
+}
+
+/* =============== rendering =============== */
+let invDirty=true, invSig='';
+
+function buildSkillRows(){
+  const el=$('#skillsList');
+  let html='',grp='';
+  SKILL_DEFS.forEach(d=>{
+    if(d.grp!==grp){grp=d.grp;html+=`<div class="grp">${grp}</div>`;}
+    html+=`<div class="skrow" id="sk_${d.key}" title=""><span class="nm">${d.name}</span><span class="ttl"></span><span class="vv">0.0</span><span class="cp">/100</span></div>`;
+  });
+  el.innerHTML=html;
+}
+function renderSkills(){
+  SKILL_DEFS.forEach(d=>{
+    const s=state.skills[d.key];
+    const row=document.getElementById('sk_'+d.key);
+    row.querySelector('.vv').textContent=fmt1(s.v);
+    row.querySelector('.cp').textContent='/'+s.cap;
+    row.querySelector('.ttl').textContent=titleFor(s.v);
+    row.classList.toggle('capped',s.v>=s.cap);
+  });
+  $('#gTotal').textContent=fmt1(totalSkill());
+  $('#hTotal').textContent=fmt1(totalSkill());
+}
+function setBar(fillId,txtId,cur,max,txt){
+  document.getElementById(fillId).style.width=(max>0?clamp(cur/max*100,0,100):0)+'%';
+  if(txtId) document.getElementById(txtId).textContent=txt!==undefined?txt:`${Math.ceil(cur)} / ${Math.ceil(max)}`;
+}
+function renderChar(){
+  setBar('hpFill','hpTxt',state.hp,derived.maxHp,`${Math.ceil(state.hp)} / ${derived.maxHp} HP`);
+  setBar('manaFill','manaTxt',state.mana,derived.maxMana,`${Math.floor(state.mana)} / ${derived.maxMana} Mana`);
+  $('#sStr').textContent=state.stats.str;
+  $('#sDex').textContent=state.stats.dex;
+  $('#sInt').textContent=state.stats.int;
+  const w=state.equip.weapon,a=state.equip.armor;
+  $('#eqWeapon').innerHTML=`<span class="enm ${w.exc?'exc':''}">${w.name}</span> — ${w.dmg} dmg`;
+  $('#eqArmor').innerHTML=`<span class="enm ${a.exc?'exc':''}">${a.name}</span> — ${a.ar} AR`;
+  let buffs='';
+  if(state.wellFed>0) buffs+=`<span class="bufftag">Well Fed (${Math.ceil(state.wellFed/60)}m)</span>`;
+  if(state.deadFor>=0) buffs+=`<span class="bufftag" style="border-color:#8a2727;color:#e08a6a;background:#3a2222">Dead (${Math.max(0,Math.ceil(20-state.deadFor))}s)</span>`;
+  $('#buffs').innerHTML=buffs;
+  $('#hGold').textContent=fmtN(state.gold);
+  $('#hKills').textContent=fmtN(state.kills);
+}
+function renderTask(){
+  const t=state.task;
+  $('#taskName').textContent=taskLabel(t);
+  $('#stopBtn').style.display=t?'':'none';
+  if(t){
+    const dur=taskDuration(t);
+    setBar('taskFill','taskTxt',t.acc||0,dur,'');
+  }else setBar('taskFill','taskTxt',0,1,'');
+  const mr=$('#monRow');
+  if(t&&t.kind==='combat'){
+    mr.style.display='flex';
+    const m=MON_BY[t.monster];
+    $('#monName').textContent=m.name;
+    setBar('monFill','monTxt',Math.max(0,t.monHp),m.hp,`${Math.max(0,Math.ceil(t.monHp))} / ${m.hp}`);
+  }else mr.style.display='none';
+}
+function renderInv(){
+  const keys=Object.keys(state.inv).filter(k=>state.inv[k]>0);
+  const sig=keys.join(',');
+  if(sig!==invSig){invSig=sig;invDirty=true;}
+  if(invDirty){
+    invDirty=false;
+    if(!keys.length){$('#invList').innerHTML='<p class="muted">Empty.</p>';return;}
+    $('#invList').innerHTML=keys.map(k=>{
+      const r=RESOURCES[k]||{name:k,sell:0};
+      const chip=r.color?`<span class="chip" style="background:${r.color}"></span>`:'';
+      return `<div class="invrow">${chip}<span class="inm">${r.name}</span><span class="icnt" id="ic_${k}">${fmtN(state.inv[k])}</span><button class="btn sellb" data-act="sellall" data-key="${k}" title="Sell all (${r.sell}gp each)">sell</button></div>`;
+    }).join('');
+  }else{
+    keys.forEach(k=>{const el=document.getElementById('ic_'+k);if(el)el.textContent=fmtN(state.inv[k]);});
+  }
+}
+
+/* --- tab bodies --- */
+function isActive(t){
+  const c=state.task;
+  if(!c) return false;
+  return Object.keys(t).every(k=>c[k]===t[k]);
+}
+function cardBtn(label,dataAttrs,locked){
+  return `<button class="btn gobtn" ${dataAttrs} ${locked?'disabled':''}>${label}</button>`;
+}
+function renderGatherTab(){
+  let html='';
+  GATHERS.forEach(g=>{
+    const sk=state.skills[g.skill].v;
+    html+=`<h3>${SKILL_BY[g.skill].name} — ${g.place} <span class="muted">(${fmt1(sk)})</span></h3><div class="cardgrid">`;
+    g.tiers.forEach((tier,i)=>{
+      const locked=sk<tier.min;
+      const active=isActive({kind:'gather',skill:g.skill,tier:i});
+      const chip=tier.color?`<span class="chip" style="background:${tier.color}"></span>`:'';
+      html+=`<div class="card ${locked?'locked':''} ${active?'active':''}">
+        <div class="cn">${chip}${tier.name}${g.skill==='mining'?' Ore':g.skill==='lumberjacking'?' Logs':''}</div>
+        <div class="cd">sells ${tier.sell}gp · ${g.time}s ${locked?`<span class="req">requires ${tier.min} skill</span>`:`· ${Math.round(successChance(sk,tier.min)*100)}% success`}</div>
+        ${cardBtn(active?'Working…':g.verb+' it',`data-act="gather" data-skill="${g.skill}" data-tier="${i}"`,locked)}
+      </div>`;
+    });
+    html+='</div>';
+  });
+  $('#tab-gather').innerHTML=html;
+}
+function renderCombatTab(){
+  const ws=state.skills.swords.v,mg=state.skills.magery.v;
+  let html=`<h3>Fighting Style</h3>
+    <button class="btn" data-act="style" data-style="melee" ${state.combatStyle==='melee'?'style="border-color:var(--gold);color:var(--gold-lt)"':''}>⚔ Warrior (Swords/Tactics)</button>
+    <button class="btn" data-act="style" data-style="magery" ${state.combatStyle==='magery'?'style="border-color:var(--gold);color:var(--gold-lt)"':''}>✦ Mage (Magery/Eval Int)</button>
+    <p class="muted">Bandages, potions and fish steaks are used automatically. Hiding &amp; Stealth grant dodge.</p>
+    <h3>Hunting Grounds</h3><div class="cardgrid">`;
+  MONSTERS.forEach(m=>{
+    const eff=state.combatStyle==='magery'?mg:ws;
+    const tooHard=eff<m.diff-30;
+    const active=isActive({kind:'combat',monster:m.key});
+    let extras='';
+    if(m.drops&&m.drops.hides) extras+=' · hides';
+    if(m.ps) extras+=` · <span style="color:var(--gold-lt)">Power Scrolls!</span>`;
+    html+=`<div class="card ${active?'active':''} ${tooHard?'locked':''}">
+      <div class="cn">${m.name}</div>
+      <div class="cd">${m.hp} hp · hits ~${m.dmg} · ${m.gold[1]?m.gold[0]+'–'+m.gold[1]+'gp':'no gold'}${extras}<br>difficulty ${m.diff}${tooHard?' <span class="req">— far beyond thee</span>':''}</div>
+      ${cardBtn(active?'Fighting…':'Attack',`data-act="fight" data-mon="${m.key}"`,tooHard)}
+    </div>`;
+  });
+  html+='</div>';
+  $('#tab-combat').innerHTML=html;
+}
+function matSelect(matType){
+  const list=matType==='ingot'?ORES:WOODS;
+  const cur=state.craftMat[matType];
+  const opts=list.map(x=>{
+    const cnt=invCount(x.key+'_'+(matType==='ingot'?'ingot':'board'));
+    return `<option value="${x.key}" ${x.key===cur?'selected':''}>${x.name} (${fmtN(cnt)})</option>`;
+  }).join('');
+  return `<select class="matsel" data-mats="${matType}">${opts}</select>`;
+}
+function renderCraftTab(){
+  let html='';
+  const sections=[
+    {skill:'blacksmithy',title:'Blacksmithy — the forge at Britain',mat:'ingot'},
+    {skill:'carpentry',title:'Carpentry — the workshop',mat:'board'},
+    {skill:'tailoring',title:'Tailoring — the sew &amp; loom'},
+    {skill:'cooking',title:'Cooking — the campfire'},
+    {skill:'alchemy',title:'Alchemy — the laboratory'},
+  ];
+  sections.forEach(sec=>{
+    const sk=state.skills[sec.skill].v;
+    html+=`<h3>${sec.title} <span class="muted">(${fmt1(sk)})</span></h3>`;
+    if(sec.mat) html+=`Material: ${matSelect(sec.mat)}`;
+    if(sec.skill==='tailoring') html+=`<button class="btn" data-act="cutcloth" style="margin-bottom:8px">✂ Cut 1 Cloth → 2 Bandages (have ${fmtN(invCount('cloth'))})</button>`;
+    html+='<div class="cardgrid">';
+    RECIPES.filter(r=>r.skill===sec.skill).forEach(r=>{
+      const tier=craftTier(r);
+      const effMin=r.min+tier*3;
+      const matKey=craftMatKey(r);
+      const have=invCount(matKey);
+      const locked=sk<effMin;
+      const active=isActive({kind:'craft',recipe:r.id});
+      let desc=`${r.qty} × ${RESOURCES[matKey].name}`;
+      if(r.kind==='weapon') desc+=` · ~${Math.round(r.dmg+tier*1.5)} dmg`;
+      if(r.kind==='armor') desc+=` · ~${Math.round(r.ar+tier*1.2)} AR`;
+      if(r.kind==='sell') desc+=` · sells ~${Math.floor((r.min+8)*(1+tier*0.7))}gp`;
+      if(r.kind==='item') desc+=` · makes ${r.outQty||1} × ${RESOURCES[r.out].name}`;
+      html+=`<div class="card ${locked?'locked':''} ${active?'active':''}">
+        <div class="cn">${r.name}</div>
+        <div class="cd">${desc}<br>${locked?`<span class="req">requires ${effMin} skill</span>`:`${Math.round(successChance(sk,effMin)*100)}% success · have ${fmtN(have)} mat`}</div>
+        ${cardBtn(active?'Crafting…':'Craft (repeat)',`data-act="craft" data-recipe="${r.id}"`,locked||have<r.qty)}
+      </div>`;
+    });
+    html+='</div>';
+  });
+  html+='<p class="muted">Crafted weapons &amp; armor are equipped when better than thy gear, otherwise sold. Failures waste half the materials — as the smiths of Minoc well know.</p>';
+  $('#tab-craft').innerHTML=html;
+}
+function renderMagicTab(){
+  const mg=state.skills.magery.v, hd=state.skills.hiding.v;
+  let html=`<h3>The Arcane Arts</h3><div class="cardgrid">
+    <div class="card ${isActive({kind:'train',skill:'meditation'})?'active':''}">
+      <div class="cn">Meditate</div>
+      <div class="cd">Restore mana swiftly and train Meditation.</div>
+      ${cardBtn(isActive({kind:'train',skill:'meditation'})?'Meditating…':'Meditate','data-act="train" data-skill="meditation"',false)}
+    </div>
+  </div>
+  <h3>Spellbook <span class="muted">(cast in combat with the Mage style)</span></h3>
+  <div class="cardgrid">`;
+  SPELLS.forEach(sp=>{
+    const known=mg>=sp.min;
+    html+=`<div class="card ${known?'':'locked'}"><div class="cn">${sp.name}</div><div class="cd">${sp.dmg} base dmg · ${sp.mana} mana${known?'':` <span class="req">requires ${sp.min} Magery</span>`}</div></div>`;
+  });
+  html+=`</div>
+  <h3>Roguery</h3><div class="cardgrid">
+    <div class="card ${isActive({kind:'train',skill:'hiding'})?'active':''}">
+      <div class="cn">Hide in the Shadows</div>
+      <div class="cd">Train Hiding. Grants dodge in combat.</div>
+      ${cardBtn(isActive({kind:'train',skill:'hiding'})?'Hiding…':'Hide','data-act="train" data-skill="hiding"',false)}
+    </div>
+    <div class="card ${hd<30?'locked':''} ${isActive({kind:'train',skill:'stealth'})?'active':''}">
+      <div class="cn">Sneak the Streets</div>
+      <div class="cd">Train Stealth, find dropped coins. ${hd<30?'<span class="req">requires 30 Hiding</span>':''}</div>
+      ${cardBtn(isActive({kind:'train',skill:'stealth'})?'Sneaking…':'Sneak','data-act="train" data-skill="stealth"',hd<30)}
+    </div>
+  </div>`;
+  $('#tab-magic').innerHTML=html;
+}
+function renderShopTab(){
+  let html='<h3>Buy Provisions</h3>';
+  SHOP.forEach(it=>{
+    html+=`<div class="shoprow"><span class="snm">${it.name} — ${it.cost}gp each <span class="muted">(have ${fmtN(invCount(it.key))})</span></span>
+      <button class="btn" data-act="buy" data-key="${it.key}" data-n="1">+1</button>
+      <button class="btn" data-act="buy" data-key="${it.key}" data-n="10">+10</button>
+      <button class="btn" data-act="buy" data-key="${it.key}" data-n="100">+100</button></div>`;
+  });
+  html+='<h3>Sell Wares</h3>';
+  const sellables=Object.keys(state.inv).filter(k=>state.inv[k]>0&&RESOURCES[k]&&RESOURCES[k].sell>0);
+  if(!sellables.length) html+='<p class="muted">Naught to sell. Go gather, hunt, or craft!</p>';
+  sellables.forEach(k=>{
+    const r=RESOURCES[k];
+    html+=`<div class="shoprow"><span class="snm">${r.name} × ${fmtN(state.inv[k])} <span class="muted">(${r.sell}gp each)</span></span>
+      <button class="btn" data-act="sellall" data-key="${k}">Sell all (+${fmtN(state.inv[k]*r.sell)}gp)</button></div>`;
+  });
+  $('#tab-shop').innerHTML=html;
+}
+
+let curTab='gather', tabsDirtyAt=0;
+function renderTabs(){
+  if(curTab==='gather') renderGatherTab();
+  else if(curTab==='combat') renderCombatTab();
+  else if(curTab==='craft') renderCraftTab();
+  else if(curTab==='magic') renderMagicTab();
+  else if(curTab==='shop') renderShopTab();
+  tabsDirtyAt=Date.now();
+}
+function renderLive(){
+  renderSkills(); renderChar(); renderTask(); renderInv();
+  if(Date.now()-tabsDirtyAt>5000) renderTabs(); // refresh unlock states etc.
+}
+
+/* =============== input =============== */
+document.addEventListener('click',e=>{
+  const el=e.target.closest('[data-act]');
+  if(!el) return;
+  const act=el.dataset.act;
+  if(act==='tab'){
+    curTab=el.dataset.tab;
+    document.querySelectorAll('.tab').forEach(t=>t.classList.toggle('on',t.dataset.tab===curTab));
+    document.querySelectorAll('.tabbody').forEach(b=>b.classList.toggle('on',b.id==='tab-'+curTab));
+    renderTabs();
+  }
+  else if(act==='gather'){
+    const skill=el.dataset.skill,tier=+el.dataset.tier;
+    const g=GATHERS.find(x=>x.skill===skill);
+    if(state.skills[skill].v<g.tiers[tier].min) return;
+    startTask({kind:'gather',skill,tier});
+  }
+  else if(act==='fight') startTask({kind:'combat',monster:el.dataset.mon});
+  else if(act==='craft'){
+    const r=RECIPE_BY[el.dataset.recipe];
+    if(invCount(craftMatKey(r))<r.qty){log('Thou lackest the materials.','bad');return;}
+    startTask({kind:'craft',recipe:r.id});
+  }
+  else if(act==='train') startTask({kind:'train',skill:el.dataset.skill});
+  else if(act==='stop') stopTask('You stop what you were doing.');
+  else if(act==='style'){state.combatStyle=el.dataset.style;renderTabs();}
+  else if(act==='buy'){
+    const it=SHOP.find(x=>x.key===el.dataset.key);
+    const n=+el.dataset.n;
+    const cost=it.cost*n;
+    if(state.gold<cost){log('Thou hast not the gold.','bad');return;}
+    state.gold-=cost; addInv(it.key,n); renderTabs();
+  }
+  else if(act==='sellall') sellAll(el.dataset.key);
+  else if(act==='cutcloth'){
+    if(invCount('cloth')<1){log('No cloth to cut.','bad');return;}
+    addInv('cloth',-1); addInv('bandage',2); renderTabs();
+  }
+  else if(act==='save'){save();log('Game saved.');}
+  else if(act==='reset'){
+    if(confirm('Truly erase thy character and start anew? This cannot be undone.')){
+      localStorage.removeItem(SAVE_KEY);
+      location.reload();
+    }
+  }
+  else if(act==='io'){
+    $('#saveIO').value=btoa(unescape(encodeURIComponent(JSON.stringify(state))));
+    $('#ioModal').classList.add('on');
+  }
+  else if(act==='doImport'){
+    try{
+      const s=JSON.parse(decodeURIComponent(escape(atob($('#saveIO').value.trim()))));
+      if(!s||!s.skills) throw 0;
+      localStorage.setItem(SAVE_KEY,JSON.stringify(s));
+      location.reload();
+    }catch(err){alert('That save could not be read.');}
+  }
+  else if(act==='closeModal') el.closest('.modalbg').classList.remove('on');
+});
+document.addEventListener('change',e=>{
+  const el=e.target.closest('[data-mats]');
+  if(!el) return;
+  state.craftMat[el.dataset.mats]=el.value;
+  renderTabs();
 });
 
-    // Game Loop
-    function gameLoop() {
-      
-      update();
-      draw();
-      requestAnimationFrame(gameLoop);
-      
-    }
-
-    // Update game state
-    function update() {
-      
-
-      // Player movement
-      if (keys.ArrowUp) player.y -= player.speed;
-      if (keys.ArrowDown) player.y += player.speed;
-      if (keys.ArrowLeft) player.x -= player.speed;
-      if (keys.ArrowRight) player.x += player.speed;
-
-      // Constrain player within canvas
-      player.x = Math.max(0, Math.min(canvas.width, player.x));
-      player.y = Math.max(0, Math.min(canvas.height, player.y));
-
-      
-
-      // Reduce damage cooldown
-      if (player.damageCooldown > 0) {
-        player.damageCooldown--;
-        
-      }
-
-      // Check for collisions with creatures (damage player)
-      for (let i = creatures.length - 1; i >= 0; i--) {
-        const creature = creatures[i];
-        const dx = player.x - creature.x;
-        const dy = player.y - creature.y;
-        const distance = Math.sqrt(dx * dx + dy * dy);
-
-        if (distance < player.size + creature.size) {
-          
-          if (player.damageCooldown === 0) {
-            player.hp -= 10;
-            player.damageCooldown = 60;
-            
-            if (player.hp <= 0) {
-              player.hp = 0;
-              
-              alert("Game Over!");
-              window.location.reload();
-            }
-          }
-        }
-      }
-
-      // Check for collisions with allies
-      for (let i = allies.length - 1; i >= 0; i--) {
-        const ally = allies[i];
-        const dx = player.x - ally.x;
-        const dy = player.y - ally.y;
-        const distance = Math.sqrt(dx * dx + dy * dy);
-
-        if (distance < player.size + ally.size && keys.Space && !ally.isFollowing) {
-          ally.isFollowing = true;
-          
-        }
-      }
-
-      // Update ally positions to follow player
-      allies.forEach(ally => {
-        if (ally.isFollowing) {
-          const dx = player.x - ally.x;
-          const dy = player.y - ally.y;
-          const distance = Math.sqrt(dx * dx + dy * dy);
-
-          if (distance > ally.size + player.size + 10) {
-            ally.x += (dx / distance) * ally.speed;
-            ally.y += (dy / distance) * ally.speed;
-            
-          }
-        }
-      });
-    }
-
-    // Draw game state
-    function draw() {
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-      // Draw player
-      drawEntity(player, player.damageCooldown > 0 ? 'darkblue' : 'blue');
-      drawHpBar(player);
-      drawPlayerHpDisplay();
-
-      // Draw creatures
-      creatures.forEach(creature => {
-        drawEntity(creature, 'red');
-        drawHpBar(creature);
-      });
-
-      // Draw allies
-      allies.forEach(ally => {
-        drawEntity(ally, 'green');
-        drawHpBar(ally);
-      });
-    }
-
-    // Draw entity (player, creature, or ally)
-    function drawEntity(entity, color) {
-      ctx.fillStyle = color;
-      ctx.beginPath();
-      ctx.arc(entity.x, entity.y, entity.size, 0, Math.PI * 2);
-      ctx.fill();
-      
-    }
-
-    // Draw HP bar above character
-    function drawHpBar(character) {
-      const barWidth = 40;
-      const barHeight = 5;
-      const barX = character.x - barWidth / 2;
-      const barY = character.y - character.size - 15;
-
-      ctx.fillStyle = 'gray';
-      ctx.fillRect(barX, barY, barWidth, barHeight);
-
-      const hpWidth = (character.hp / character.maxHp) * barWidth;
-      ctx.fillStyle = 'red';
-      ctx.fillRect(barX, barY, hpWidth, barHeight);
-      
-    }
-
-    // Draw player HP bar and numerical value in the top left corner
-    function drawPlayerHpDisplay() {
-      const barWidth = 200;
-      const barHeight = 20;
-      const barX = 20;
-      const barY = 20;
-
-      ctx.fillStyle = 'gray';
-      ctx.fillRect(barX, barY, barWidth, barHeight);
-
-      const hpWidth = (player.hp / player.maxHp) * barWidth;
-      ctx.fillStyle = 'red';
-      ctx.fillRect(barX, barY, hpWidth, barHeight);
-
-      ctx.fillStyle = 'white';
-      ctx.font = '16px Arial';
-      ctx.fillText(`${player.hp} / ${player.maxHp}`, barX + barWidth / 2 - 25, barY + barHeight - 5);
-      
-    }
-
-    // Spawn creatures randomly
-    function spawnCreature() {
-      const creature = {
-        x: Math.random() * canvas.width,
-        y: Math.random() * canvas.height,
-        size: 15,
-        hp: 50,
-        maxHp: 50
-      };
-      creatures.push(creature);
-      
-    }
-
-    // Spawn allies randomly
-    function spawnAlly() {
-      const ally = {
-        x: Math.random() * canvas.width,
-        y: Math.random() * canvas.height,
-        size: 15,
-        hp: 50,
-        maxHp: 50,
-        speed: 2,
-        isFollowing: false
-      };
-      allies.push(ally);
-      
-    }
-
-    // Start the game loop
-    gameLoop();
-
-    // Spawn a creature every 2 seconds
-    setInterval(spawnCreature, 2000);
-
-    // Spawn an ally every 10 seconds
-    setInterval(spawnAlly, 10000);
-  </script>
+/* =============== boot =============== */
+if(!load()){
+  state=freshState();
+  recalcDerived();
+  log('Welcome to Britannia, young adventurer!','epic');
+  log('Pick a task — mine ore, hunt mongbats, or hide in the shadows. Skills rise by use, as they always have.');
+  log('There is no 700-point skill cap in these lands. Grandmaster them all.');
+}else{
+  recalcDerived();
+  offlineCatchup();
+  log('Thy tale continues…');
+}
+buildSkillRows();
+renderTabs();
+renderLive();
+lastFrame=Date.now();
+setInterval(tick,250);
+setInterval(save,15000);
+window.addEventListener('beforeunload',save);
+/* debug hook (harmless): SF.simulate(3600) fast-forwards an hour */
+window.SF={get state(){return state;},simulate:s=>{quiet=true;simulate(s);quiet=false;renderLive();renderTabs();}};
+</script>
 </body>
 </html>
