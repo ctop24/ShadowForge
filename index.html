@@ -115,13 +115,30 @@ header h1 small{display:block;font-size:12px;color:var(--dim);letter-spacing:2px
 .shoprow .snm{flex:1}
 .shoprow .btn{font-size:11px;padding:2px 8px}
 
-/* log */
-#log{max-height:210px;overflow-y:auto;font-size:12px}
-#log p{margin:1px 0;color:var(--dim)}
+/* journal */
+.jhead{display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-bottom:7px;border-bottom:1px solid var(--stone-br);padding-bottom:5px}
+.jhead h2{margin:0;border:none;padding:0;flex:none}
+.jtabs{display:flex;gap:3px;flex-wrap:wrap;flex:1}
+.jtab{background:var(--stone);border:1px solid var(--stone-br);color:var(--dim);border-radius:4px;padding:2px 9px;font-size:11px;font-family:Georgia,serif}
+.jtab:hover{color:var(--gold-lt)}
+.jtab.on{background:var(--stone-br);border-color:var(--gold);color:var(--gold-lt)}
+.jtab .jn{font-size:9px;color:#7a6f5c;font-variant-numeric:tabular-nums}
+.jtab.on .jn{color:var(--gold)}
+#log{max-height:260px;overflow-y:auto;font-size:12px}
+#log p{margin:1px 0;color:var(--dim);display:flex;gap:6px;align-items:baseline}
+#log p .ts{flex:none;font-size:10px;color:#6b6353;font-variant-numeric:tabular-nums}
+#log p .mg{flex:1}
+#log p .rep{flex:none;font-size:10px;color:var(--gold);font-variant-numeric:tabular-nums}
 #log p.good{color:#a8d08a}
 #log p.skill{color:#8ab8d0}
 #log p.bad{color:#e08a6a}
+#log p.miss{color:#7f7767}
 #log p.epic{color:var(--gold-lt);font-weight:bold}
+
+/* task tally */
+#taskStats{display:flex;flex-wrap:wrap;gap:2px 12px;margin-top:7px;font-size:11px;color:var(--dim)}
+#taskStats span{white-space:nowrap}
+#taskStats b{color:var(--gold-lt);font-variant-numeric:tabular-nums}
 
 /* modal */
 .modalbg{position:fixed;inset:0;background:rgba(0,0,0,.75);display:none;align-items:center;justify-content:center;z-index:50}
@@ -170,6 +187,7 @@ textarea#saveIO{width:100%;height:70px;background:var(--stone);color:var(--txt);
           <span id="monName" class="serif" style="color:var(--gold-lt)"></span>
           <div class="bar mon"><div class="fill" id="monFill"></div><div class="txt" id="monTxt"></div></div>
         </div>
+        <div id="taskStats"></div>
       </div>
 
       <div class="tabs">
@@ -185,7 +203,14 @@ textarea#saveIO{width:100%;height:70px;background:var(--stone);color:var(--txt);
       <div class="tabbody panel" id="tab-magic"></div>
       <div class="tabbody panel" id="tab-shop"></div>
 
-      <div class="panel"><h2>Journal</h2><div id="log"></div></div>
+      <div class="panel">
+        <div class="jhead">
+          <h2>Journal</h2>
+          <div class="jtabs" id="jTabs"></div>
+          <button class="btn" data-act="clearlog" style="font-size:10px;padding:2px 8px">Clear</button>
+        </div>
+        <div id="log"></div>
+      </div>
     </main>
 
     <!-- RIGHT: character + inventory -->
@@ -294,9 +319,12 @@ const FISHES=[
   {key:'rare_fish',name:'Rare Fish',min:90,sell:34,steaks:7},
 ];
 const GATHERS=[
-  {skill:'mining',verb:'Mine',place:'the caves near Minoc',time:2.5,tiers:ORES,res:o=>o.key+'_ingot',resName:o=>o.name+' Ingot'},
-  {skill:'lumberjacking',verb:'Chop',place:'the woods of Yew',time:3.0,tiers:WOODS,res:w=>w.key+'_board',resName:w=>w.name+' Board'},
-  {skill:'fishing',verb:'Fish for',place:'the docks of Trinsic',time:4.0,tiers:FISHES,res:f=>'raw_'+f.key,resName:f=>'Raw '+f.name},
+  {skill:'mining',verb:'Mine',place:'the caves near Minoc',time:2.5,tiers:ORES,res:o=>o.key+'_ingot',resName:o=>o.name+' Ingot',
+   past:'mine',fail:'You loosen the rock, but find no usable ore.',rich:'A rich vein!'},
+  {skill:'lumberjacking',verb:'Chop',place:'the woods of Yew',time:3.0,tiers:WOODS,res:w=>w.key+'_board',resName:w=>w.name+' Board',
+   past:'chop',fail:'Thine axe bites deep, but the wood is knotted and useless.',rich:'The trunk splits clean!'},
+  {skill:'fishing',verb:'Fish for',place:'the docks of Trinsic',time:4.0,tiers:FISHES,res:f=>'raw_'+f.key,resName:f=>'Raw '+f.name,
+   past:'catch',fail:'Thy line comes up empty.',rich:'A great catch!'},
 ];
 
 const SPELLS=[
@@ -412,15 +440,47 @@ function recalcDerived(){
 function totalSkill(){return SKILL_DEFS.reduce((a,d)=>a+state.skills[d.key].v,0);}
 
 /* =============== journal =============== */
-let quiet=false;
-function log(msg,cls){
+/* Every line is filed under a channel so the journal can be read one
+   subject at a time — the Combat tab is a proper hit/miss fight log. */
+const LOG_TABS=[['all','All'],['combat','Combat'],['work','Labour'],['skill','Skills'],['loot','Loot'],['system','System']];
+const LOG_MAX=90, LOG_SHOWN=130;
+const logs={combat:[],work:[],skill:[],loot:[],system:[]};
+let quiet=false, logSeq=0, logDirty=true, logTab='all';
+function log(msg,cls,chan){
   if(quiet) return;
-  const el=$('#log');
-  const p=document.createElement('p');
-  if(cls) p.className=cls;
-  p.textContent=msg;
-  el.prepend(p);
-  while(el.children.length>70) el.lastChild.remove();
+  const arr=logs[chan]||logs.system;
+  const last=arr[arr.length-1];
+  if(last&&last.msg===msg&&last.cls===cls){last.n++;last.t=Date.now();last.seq=++logSeq;}
+  else{
+    arr.push({msg,cls:cls||'',n:1,t:Date.now(),seq:++logSeq});
+    if(arr.length>LOG_MAX) arr.shift();
+  }
+  logDirty=true;
+}
+function clearLog(){for(const k in logs) logs[k].length=0; logDirty=true;}
+const esc=s=>String(s).replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
+const two=n=>String(n).padStart(2,'0');
+function stamp(t){const d=new Date(t);return two(d.getHours())+':'+two(d.getMinutes())+':'+two(d.getSeconds());}
+function buildJournalTabs(){
+  $('#jTabs').innerHTML=LOG_TABS.map(([k,n])=>
+    `<button class="jtab ${k===logTab?'on':''}" data-act="jtab" data-j="${k}">${n} <span class="jn" id="jn_${k}"></span></button>`).join('');
+}
+function renderJournal(){
+  LOG_TABS.forEach(([k])=>{
+    const el=document.getElementById('jn_'+k); if(!el) return;
+    const n=k==='all'?Object.values(logs).reduce((a,b)=>a+b.length,0):logs[k].length;
+    el.textContent=n?n:'';
+  });
+  if(!logDirty) return;
+  logDirty=false;
+  let rows=logTab==='all'?[].concat(...Object.values(logs)):logs[logTab].slice();
+  rows.sort((a,b)=>b.seq-a.seq);
+  rows=rows.slice(0,LOG_SHOWN);
+  const box=$('#log'), keep=box.scrollTop;
+  box.innerHTML=rows.length
+    ? rows.map(e=>`<p class="${e.cls}"><span class="ts">${stamp(e.t)}</span><span class="mg">${esc(e.msg)}</span>${e.n>1?`<span class="rep">×${e.n}</span>`:''}</p>`).join('')
+    : '<p class="muted">Naught to report here yet.</p>';
+  if(keep) box.scrollTop=keep;
 }
 
 /* =============== skill system (UO-style gains) =============== */
@@ -435,16 +495,18 @@ function tryGain(key,diff,mult){
   ch *= (1-(s.v/(s.cap+10))*0.72);            // slower near the cap
   ch *= mult;
   if(Math.random()>=ch) return false;
+  const prev=s.v;
   s.v=Math.min(s.cap,Math.round((s.v+0.1)*10)/10);
+  log(`Your ${SKILL_BY[key].name} skill has increased by ${fmt1(s.v-prev)} to ${fmt1(s.v)}.`,'skill','skill');
   const whole=Math.round(s.v*10)%10===0;
-  if(whole) log(`Your ${SKILL_BY[key].name} skill has increased to ${fmt1(s.v)}.`,'skill');
   if(whole&&titleFor(s.v)&&titleFor(s.v)!==titleFor(s.v-1))
-    log(`Thou art now a ${titleFor(s.v)} of ${SKILL_BY[key].name}!`,'epic');
+    log(`Thou art now a ${titleFor(s.v)} of ${SKILL_BY[key].name}!`,'epic','skill');
+  if(s.v>=s.cap&&prev<s.cap) log(`Thou hast reached the limit of thy ${SKILL_BY[key].name} (${s.cap}). Seek a Power Scroll.`,'bad','skill');
   // UO-style stat gain by use
   const st=SKILL_BY[key].stat;
   if(state.stats[st]<100&&Math.random()<0.22*(1-state.stats[st]/105)){
     state.stats[st]++;recalcDerived();
-    if(state.stats[st]%5===0) log(`Thy ${st==='str'?'Strength':st==='dex'?'Dexterity':'Intelligence'} has risen to ${state.stats[st]}.`,'skill');
+    log(`Thy ${st==='str'?'Strength':st==='dex'?'Dexterity':'Intelligence'} has risen to ${state.stats[st]}.`,'skill','skill');
   }
   return true;
 }
@@ -454,7 +516,7 @@ function applyPowerScroll(){
   if(!pool.length) return;
   const d=pool[rndi(0,pool.length-1)];
   state.skills[d.key].cap+=5;
-  log(`A Power Scroll of ${d.name}! Thy cap is now ${state.skills[d.key].cap}.`,'epic');
+  log(`A Power Scroll of ${d.name}! Thy cap is now ${state.skills[d.key].cap}.`,'epic','loot');
 }
 
 /* =============== inventory / economy =============== */
@@ -464,20 +526,33 @@ function sellAll(key){
   const n=invCount(key); if(!n) return;
   const g=n*RESOURCES[key].sell;
   addInv(key,-n); state.gold+=g;
-  log(`Sold ${n} × ${RESOURCES[key].name} for ${fmtN(g)}gp.`,'good');
+  log(`Sold ${n} × ${RESOURCES[key].name} for ${fmtN(g)}gp.`,'good','loot');
   renderTabs();
 }
 
 /* =============== tasks =============== */
+/* running tally of outcomes for whatever thou art doing */
+const STAT_TPL={
+  combat:{swings:0,hits:0,misses:0,crits:0,casts:0,fizzles:0,dmgOut:0,dmgIn:0,dodges:0,struck:0,heals:0,healFails:0,kills:0},
+  gather:{tries:0,succ:0,fail:0,rich:0,got:0},
+  craft:{tries:0,succ:0,fail:0,exc:0},
+  train:{tries:0,succ:0,fail:0},
+};
+function taskStats(t){
+  const tpl=STAT_TPL[t.kind]||{};
+  if(!t.st) t.st=Object.assign({},tpl);
+  else for(const k in tpl) if(t.st[k]===undefined) t.st[k]=tpl[k];  // old saves
+  return t.st;
+}
 function startTask(t){
-  if(state.deadFor>=0){log('Thou art dead. Wait for resurrection.','bad');return;}
-  state.task=t; t.acc=0;
-  if(t.kind==='combat'){const m=MON_BY[t.monster]; t.monHp=m.hp; log(`You attack ${aOrAn(m.name)}!`);}
+  if(state.deadFor>=0){log('Thou art dead. Wait for resurrection.','bad','system');return;}
+  state.task=t; t.acc=0; t.st=Object.assign({},STAT_TPL[t.kind]||{});
+  if(t.kind==='combat'){const m=MON_BY[t.monster]; t.monHp=m.hp; log(`You attack ${aOrAn(m.name)}!`,'','combat');}
   renderTabs(); renderTask();
 }
 function stopTask(msg){
   state.task=null;
-  if(msg) log(msg);
+  if(msg) log(msg,'','system');
   renderTabs(); renderTask();
 }
 function aOrAn(n){return (/^[aeiou]/i.test(n)?'an ':'a ')+n;}
@@ -508,9 +583,19 @@ function doGather(t){
   const tier=g.tiers[t.tier];
   const sk=state.skills[t.skill].v;
   if(sk<tier.min){stopTask('Thou canst not harvest that yet.');return;}
+  const st=taskStats(t); st.tries++;
   tryGain(t.skill,tier.min);
+  const nm=g.resName(tier);
   if(Math.random()<successChance(sk,tier.min)){
-    addInv(g.res(tier),1);
+    const rich=Math.random()<clamp(0.03+(sk-tier.min)/400,0.03,0.28);
+    const n=rich?2:1;
+    addInv(g.res(tier),n);
+    st.succ++; st.got+=n;
+    if(rich){st.rich++;log(`${g.rich} You ${g.past} ${n} × ${nm}.`,'epic','work');}
+    else log(`You ${g.past} ${aOrAn(nm)}.`,'good','work');
+  }else{
+    st.fail++;
+    log(g.fail,'miss','work');
   }
 }
 
@@ -528,37 +613,70 @@ function pickSpell(){
 }
 function doCombat(t,roundTime){
   const m=MON_BY[t.monster];
+  const st=taskStats(t);
   // -- player attack --
   let castedSpell=false;
   if(state.combatStyle==='magery'){
     const sp=pickSpell();
     if(sp){
       state.mana-=sp.mana;
-      const dmg=sp.dmg*(0.5+state.skills.magery.v/200)*(1+state.skills.evalint.v/150)*rnd(0.85,1.15);
-      t.monHp-=dmg;
+      st.casts++;
+      castedSpell=true;
+      const fizzle=Math.random()<clamp(0.20-(state.skills.magery.v-sp.min)*0.006,0.01,0.30);
+      if(fizzle){
+        st.fizzles++;
+        log(`Thy ${sp.name} fizzles — the words of power are lost.`,'bad','combat');
+      }else{
+        let dmg=sp.dmg*(0.5+state.skills.magery.v/200)*(1+state.skills.evalint.v/150)*rnd(0.85,1.15);
+        const crit=Math.random()<clamp(state.skills.evalint.v/500,0,0.22);
+        if(crit){dmg*=1.6;st.crits++;}
+        t.monHp-=dmg; st.dmgOut+=dmg;
+        log(crit
+          ?`Thy ${sp.name} erupts upon the ${m.name} for ${Math.round(dmg)} damage — a devastating casting!`
+          :`You cast ${sp.name} upon the ${m.name} for ${Math.round(dmg)} damage.`,
+          crit?'epic':'good','combat');
+      }
       tryGain('magery',Math.min(sp.min+20,m.diff+15));
       tryGain('evalint',m.diff,0.5);
-      castedSpell=true;
+    }else if(!t.dry){
+      t.dry=true;
+      log('Thy mana is spent — thou must fall back upon steel.','bad','combat');
     }
   }
   if(!castedSpell){
+    if(state.combatStyle==='magery'&&state.mana>=4) t.dry=false;
     const hitCh=clamp(0.60+(state.skills.swords.v-m.diff)*0.012,0.25,0.95);
-    if(Math.random()<hitCh) t.monHp-=playerWeaponDmg()*rnd(0.85,1.15);
+    st.swings++;
+    if(Math.random()<hitCh){
+      let dmg=playerWeaponDmg()*rnd(0.85,1.15);
+      const crit=Math.random()<clamp(0.04+state.skills.tactics.v/600+state.skills.anatomy.v/900,0,0.30);
+      if(crit){dmg*=1.75;st.crits++;}
+      t.monHp-=dmg; st.hits++; st.dmgOut+=dmg;
+      log(crit
+        ?`A mighty blow! Thy ${state.equip.weapon.name} rends the ${m.name} for ${Math.round(dmg)} damage.`
+        :`You hit the ${m.name} for ${Math.round(dmg)} damage.`,
+        crit?'epic':'good','combat');
+    }else{
+      st.misses++;
+      log(`You miss the ${m.name}.`,'miss','combat');
+    }
     tryGain('swords',m.diff);
     tryGain('tactics',m.diff,0.6);
     tryGain('anatomy',m.diff,0.35);
   }
   // -- monster slain? --
   if(t.monHp<=0){
-    state.kills++; state.deaths=0;
+    state.kills++; state.deaths=0; st.kills++;
+    log(`You have slain ${aOrAn(m.name)}!`,'good','combat');
     const g=rndi(m.gold[0],m.gold[1]);
     state.gold+=g;
-    let msg=`You have slain ${aOrAn(m.name)}! (+${g}gp`;
-    if(m.drops) for(const [k,range] of Object.entries(m.drops)){const n=rndi(range[0],range[1]);addInv(k,n);msg+=`, +${n} ${RESOURCES[k].name}`;}
-    msg+=')';
-    log(msg,'good');
+    const spoils=[];
+    if(g) spoils.push(`${fmtN(g)}gp`);
+    if(m.drops) for(const [k,range] of Object.entries(m.drops)){const n=rndi(range[0],range[1]);addInv(k,n);spoils.push(`${n} × ${RESOURCES[k].name}`);}
+    log(spoils.length?`Thou lootest the corpse: ${spoils.join(', ')}.`:'The corpse holds naught of worth.',spoils.length?'good':'miss','loot');
     if(m.ps&&Math.random()<m.ps) applyPowerScroll();
     t.monHp=m.hp; // next one wanders in
+    log(`Another ${m.name} wanders in.`,'','combat');
     return;
   }
   // -- monster attacks (normalized dps so swing speed is fair) --
@@ -567,20 +685,39 @@ function doCombat(t,roundTime){
     const ar=state.equip.armor.ar;
     const dmg=(m.dmg/3.0)*roundTime*(1-ar/(ar+50))*rnd(0.8,1.2);
     state.hp-=dmg;
+    st.struck++; st.dmgIn+=dmg;
+    log(`The ${m.name} hits thee for ${Math.round(dmg)} damage.`,'bad','combat');
+  }else{
+    st.dodges++;
+    log(`You slip aside — the ${m.name} misses thee.`,'miss','combat');
   }
   // -- auto healing --
   if(state.hp<derived.maxHp*0.5&&state.potCd<=0){
     for(const [pk,heal] of POTIONS){
-      if(invCount(pk)>0){addInv(pk,-1);state.hp=Math.min(derived.maxHp,state.hp+heal);state.potCd=15;break;}
+      if(invCount(pk)>0){
+        addInv(pk,-1);
+        const before=state.hp;
+        state.hp=Math.min(derived.maxHp,state.hp+heal);
+        state.potCd=15;
+        log(`You quaff a ${RESOURCES[pk].name} and recover ${Math.round(state.hp-before)} hit points.`,'good','combat');
+        break;
+      }
     }
   }
   if(state.hp<derived.maxHp*0.75&&state.bandCd<=0&&invCount('bandage')>0){
     addInv('bandage',-1);
-    const heal=12+state.skills.healing.v*0.5+state.skills.anatomy.v*0.15;
-    state.hp=Math.min(derived.maxHp,state.hp+heal);
-    state.bandCd=8;
     tryGain('healing',Math.min(m.diff,state.skills.healing.v+15),0.8);
     tryGain('anatomy',m.diff,0.3);
+    if(Math.random()<clamp(0.72+state.skills.healing.v*0.0028,0.72,0.99)){
+      const heal=12+state.skills.healing.v*0.5+state.skills.anatomy.v*0.15;
+      const before=state.hp;
+      state.hp=Math.min(derived.maxHp,state.hp+heal);
+      state.bandCd=8; st.heals++;
+      log(`You bind thy wounds and recover ${Math.round(state.hp-before)} hit points.`,'good','combat');
+    }else{
+      state.bandCd=3; st.healFails++;   // a botched dressing is quick to retry
+      log('Thy bandage slips — the wound is not staunched.','bad','combat');
+    }
   }
   // -- death --
   if(state.hp<=0){
@@ -588,7 +725,9 @@ function doCombat(t,roundTime){
     state.gold-=lost;
     state.hp=0; state.deadFor=0; state.task=null;
     state.lastCombat=t.monster; state.deaths=(state.deaths||0)+1;
-    log(`Thou art dead! A wandering healer will resurrect thee shortly. (-${fmtN(lost)}gp)`,'bad');
+    log(`Thou art dead! A wandering healer will resurrect thee shortly.`,'bad','combat');
+    log(`Thy purse is lighter by ${fmtN(lost)}gp.`,'bad','loot');
+    log(`Final tally: ${st.hits+ (st.casts-st.fizzles)} landed, ${st.misses+st.fizzles} squandered, ${fmtN(st.dmgOut)} damage dealt, ${fmtN(st.dmgIn)} taken, ${st.kills} slain.`,'','combat');
     renderTabs();
   }
 }
@@ -607,21 +746,29 @@ function craftTier(r){
 function doCraft(t){
   const r=RECIPE_BY[t.recipe];
   const matKey=craftMatKey(r);
-  if(invCount(matKey)<r.qty){stopTask(`Out of ${RESOURCES[matKey].name}s — crafting halted.`);return;}
+  if(invCount(matKey)<r.qty){stopTask(`Out of ${RESOURCES[matKey].name} — crafting halted.`);return;}
   const tier=craftTier(r);
   const effMin=r.min+tier*3;
   const sk=state.skills[r.skill].v;
   if(sk<effMin){stopTask('That work is beyond thy skill.');return;}
+  const st=taskStats(t); st.tries++;
   tryGain(r.skill,effMin);
+  const matName0=RESOURCES[matKey].name;
   if(Math.random()>=successChance(sk,effMin)){
-    addInv(matKey,-Math.ceil(r.qty/2)); // failures waste half the material
+    const lost=Math.ceil(r.qty/2); // failures waste half the material
+    addInv(matKey,-lost);
+    st.fail++;
+    log(`You fail to make the ${r.name}, ruining ${lost} × ${matName0}.`,'bad','work');
     return;
   }
   addInv(matKey,-r.qty);
   const exc=Math.random()<clamp((sk-effMin)/200+0.05,0,0.5);
+  st.succ++; if(exc) st.exc++;
   const matName=r.mat==='ingot'?ORES[tier].name:r.mat==='board'?WOODS[tier].name:null;
   const itemName=(exc?'Exceptional ':'')+(matName&&tier>0?matName+' ':'')+r.name;
   const value=Math.floor((r.min+8)*(1+tier*0.7)*(exc?1.75:1));
+  const pre=exc?'Of exceptional quality! ':'';
+  const cls=exc?'epic':'good';
   if(r.kind==='weapon'||r.kind==='armor'){
     const item=r.kind==='weapon'
       ?{name:itemName,dmg:Math.round(r.dmg+tier*1.5+(exc?2:0)),tier,exc}
@@ -629,12 +776,20 @@ function doCraft(t){
     const slot=r.kind;
     const cur=state.equip[slot];
     const better=r.kind==='weapon'?item.dmg>cur.dmg:item.ar>cur.ar;
-    if(better){state.equip[slot]=item;log(`You crafted ${aOrAn(itemName)} and equip it!`,'good');}
-    else{state.gold+=value;}
+    if(better){
+      state.equip[slot]=item;
+      log(`${pre}You craft ${aOrAn(itemName)} (${r.kind==='weapon'?item.dmg+' dmg':item.ar+' AR'}) and equip it!`,cls,'work');
+    }else{
+      state.gold+=value;
+      log(`${pre}You craft ${aOrAn(itemName)} — no better than thy gear, so the smith buys it for ${fmtN(value)}gp.`,cls,'work');
+    }
   }else if(r.kind==='item'){
-    addInv(r.out,r.outQty||1);
+    const n=r.outQty||1;
+    addInv(r.out,n);
+    log(`${pre}You craft ${n} × ${RESOURCES[r.out].name}.`,cls,'work');
   }else{ // sell
     state.gold+=value;
+    log(`${pre}You craft ${aOrAn(itemName)} and sell it for ${fmtN(value)}gp.`,cls,'work');
   }
 }
 
@@ -642,9 +797,28 @@ function doCraft(t){
 function doTrain(t){
   const sk=state.skills[t.skill];
   if(t.skill==='stealth'&&state.skills.hiding.v<30){stopTask('Thou must learn Hiding (30) before Stealth.');return;}
+  const st=taskStats(t); st.tries++;
   tryGain(t.skill,Math.max(0,sk.v-12));
-  if(t.skill==='meditation') state.mana=Math.min(derived.maxMana,state.mana+3+sk.v/25);
-  if(t.skill==='stealth'&&Math.random()<0.25){const g=rndi(1,3+Math.floor(sk.v/10));state.gold+=g;}
+  if(t.skill==='meditation'){
+    const before=state.mana;
+    state.mana=Math.min(derived.maxMana,state.mana+3+sk.v/25);
+    const got=Math.round(state.mana-before);
+    if(state.mana>=derived.maxMana&&got<=0){st.succ++;log('Thy mind is already clear; thy mana is full.','miss','work');}
+    else{st.succ++;log(`You enter a meditative trance and recover ${got} mana.`,'good','work');}
+    return;
+  }
+  const chance=clamp(0.45+sk.v*0.005,0.30,0.98);
+  if(Math.random()<chance){
+    st.succ++;
+    if(t.skill==='hiding'){log('You conceal thyself in the shadows.','good','work');}
+    else{
+      log('You move quietly, unseen by any.','good','work');
+      if(Math.random()<0.25){const g=rndi(1,3+Math.floor(sk.v/10));state.gold+=g;log(`You find ${g}gp dropped in the street.`,'good','loot');}
+    }
+  }else{
+    st.fail++;
+    log(t.skill==='hiding'?'You fail to hide thyself.':'Thou stumblest — thy steps are heard.','bad','work');
+  }
 }
 
 /* =============== game loop =============== */
@@ -663,13 +837,13 @@ function advance(dt){
     state.deadFor+=dt;
     if(state.deadFor>=20){
       state.deadFor=-1;state.hp=Math.floor(derived.maxHp*0.5);
-      log('The healer resurrects thee. "Be more careful, milord."');
+      log('The healer resurrects thee. "Be more careful, milord."','good','system');
       if(state.lastCombat&&!state.task){
         if((state.deaths||0)<3){
           state.task={kind:'combat',monster:state.lastCombat,acc:0,monHp:MON_BY[state.lastCombat].hp};
-          log('You steel yourself and return to the fight!');
+          log('You steel yourself and return to the fight!','','combat');
         }else{
-          log('Thrice slain! Thou art outmatched — seek easier prey, better gear, or more bandages.','bad');
+          log('Thrice slain! Thou art outmatched — seek easier prey, better gear, or more bandages.','bad','combat');
           state.lastCombat=null; state.deaths=0;
         }
       }
@@ -677,7 +851,7 @@ function advance(dt){
   }
   // well fed
   if(state.wellFed>0) state.wellFed=Math.max(0,state.wellFed-dt);
-  else if(invCount('fish_steak')>0){addInv('fish_steak',-1);state.wellFed=600;log('You eat a fish steak. You feel well fed.');}
+  else if(invCount('fish_steak')>0){addInv('fish_steak',-1);state.wellFed=600;log('You eat a fish steak. You feel well fed.','good','system');}
   // regen
   const inCombat=state.task&&state.task.kind==='combat';
   if(state.deadFor<0){
@@ -725,10 +899,12 @@ function offlineCatchup(){
   const away=Math.floor((Date.now()-state.lastSeen)/1000);
   if(away<60) return;
   const capped=Math.min(away,36000); // 10 hours
+  const task=state.task;
   const before={
     gold:state.gold,kills:state.kills,
     skills:Object.fromEntries(SKILL_DEFS.map(d=>[d.key,state.skills[d.key].v])),
     inv:{...state.inv},
+    st:task?{...taskStats(task)}:null, kind:task?task.kind:null,
   };
   quiet=true;
   simulate(capped);
@@ -744,6 +920,28 @@ function offlineCatchup(){
     const dv=state.skills[d.key].v-before.skills[d.key];
     if(dv>0.05) lines.push(`<li>${d.name}: +<b>${fmt1(dv)}</b> (now ${fmt1(state.skills[d.key].v)})</li>`);
   });
+  // what the task actually did whilst thou wert gone
+  if(before.st&&state.task&&state.task.kind===before.kind){
+    const s2=taskStats(state.task), d=k=>Math.round((s2[k]||0)-(before.st[k]||0));
+    const p=(a,b)=>b>0?' ('+Math.round(a/b*100)+'%)':'';
+    if(before.kind==='combat'){
+      const sw=d('swings'),hi=d('hits'),ca=d('casts'),fz=d('fizzles');
+      if(sw) lines.push(`<li>Swung <b>${sw}</b> times — <b>${hi}</b> hits${p(hi,sw)}, <b>${d('misses')}</b> misses</li>`);
+      if(ca) lines.push(`<li>Cast <b>${ca}</b> spells — <b>${ca-fz}</b> landed${p(ca-fz,ca)}, <b>${fz}</b> fizzled</li>`);
+      if(d('crits')) lines.push(`<li>Landed <b>${d('crits')}</b> mighty blows</li>`);
+      lines.push(`<li>Dealt <b>${fmtN(d('dmgOut'))}</b> damage, took <b>${fmtN(d('dmgIn'))}</b> (dodged <b>${d('dodges')}</b>)</li>`);
+      if(d('heals')+d('healFails')) lines.push(`<li>Applied <b>${d('heals')}</b> bandages, fumbled <b>${d('healFails')}</b></li>`);
+    }else if(before.kind==='gather'){
+      const tr=d('tries');
+      lines.push(`<li>Harvested <b>${d('succ')}</b> of <b>${tr}</b> attempts${p(d('succ'),tr)}, <b>${d('fail')}</b> came up empty${d('rich')?`, <b>${d('rich')}</b> rich finds`:''}</li>`);
+    }else if(before.kind==='craft'){
+      const tr=d('tries');
+      lines.push(`<li>Crafted <b>${d('succ')}</b> of <b>${tr}</b> attempts${p(d('succ'),tr)}, <b>${d('fail')}</b> ruined${d('exc')?`, <b>${d('exc')}</b> exceptional`:''}</li>`);
+    }else if(before.kind==='train'){
+      const tr=d('tries');
+      if(tr) lines.push(`<li>Practised <b>${tr}</b> times — <b>${d('succ')}</b> succeeded${p(d('succ'),tr)}, <b>${d('fail')}</b> failed</li>`);
+    }
+  }
   const keys=new Set([...Object.keys(before.inv),...Object.keys(state.inv)]);
   keys.forEach(k=>{
     const dv=(state.inv[k]||0)-(before.inv[k]||0);
@@ -830,6 +1028,33 @@ function renderTask(){
     setBar('monFill','monTxt',Math.max(0,t.monHp),m.hp,`${Math.max(0,Math.ceil(t.monHp))} / ${m.hp}`);
   }else mr.style.display='none';
 }
+const pctOf=(a,b)=>b>0?Math.round(a/b*100)+'%':'—';
+const tchip=(l,v)=>`<span>${l} <b>${v}</b></span>`;
+function renderTaskStats(){
+  const el=$('#taskStats'), t=state.task;
+  if(!t){el.innerHTML='';return;}
+  const s=taskStats(t);
+  let h='';
+  if(t.kind==='combat'){
+    if(s.swings) h+=tchip('Swings',s.swings)+tchip('Hits',`${s.hits} (${pctOf(s.hits,s.swings)})`)+tchip('Misses',s.misses);
+    if(s.casts) h+=tchip('Spells',s.casts)+tchip('Landed',`${s.casts-s.fizzles} (${pctOf(s.casts-s.fizzles,s.casts)})`)+tchip('Fizzles',s.fizzles);
+    h+=tchip('Mighty blows',s.crits)
+      +tchip('Dmg dealt',fmtN(s.dmgOut))
+      +tchip('Dmg taken',fmtN(s.dmgIn))
+      +tchip('Dodged',`${s.dodges} (${pctOf(s.dodges,s.dodges+s.struck)})`)
+      +tchip('Bandages',`${s.heals}/${s.heals+s.healFails}`)
+      +tchip('Slain',s.kills);
+  }else if(t.kind==='gather'){
+    h+=tchip('Attempts',s.tries)+tchip('Success',`${s.succ} (${pctOf(s.succ,s.tries)})`)
+      +tchip('Failed',s.fail)+tchip('Rich finds',s.rich)+tchip('Gathered',fmtN(s.got));
+  }else if(t.kind==='craft'){
+    h+=tchip('Attempts',s.tries)+tchip('Crafted',`${s.succ} (${pctOf(s.succ,s.tries)})`)
+      +tchip('Failed',s.fail)+tchip('Exceptional',`${s.exc} (${pctOf(s.exc,s.succ)})`);
+  }else{
+    h+=tchip('Attempts',s.tries)+tchip('Success',`${s.succ} (${pctOf(s.succ,s.tries)})`)+tchip('Failed',s.fail);
+  }
+  el.innerHTML=h;
+}
 function renderInv(){
   const keys=Object.keys(state.inv).filter(k=>state.inv[k]>0);
   const sig=keys.join(',');
@@ -880,7 +1105,8 @@ function renderCombatTab(){
   let html=`<h3>Fighting Style</h3>
     <button class="btn" data-act="style" data-style="melee" ${state.combatStyle==='melee'?'style="border-color:var(--gold);color:var(--gold-lt)"':''}>⚔ Warrior (Swords/Tactics)</button>
     <button class="btn" data-act="style" data-style="magery" ${state.combatStyle==='magery'?'style="border-color:var(--gold);color:var(--gold-lt)"':''}>✦ Mage (Magery/Eval Int)</button>
-    <p class="muted">Bandages, potions and fish steaks are used automatically. Hiding &amp; Stealth grant dodge.</p>
+    <p class="muted">Bandages, potions and fish steaks are used automatically. Hiding &amp; Stealth grant dodge.<br>
+    Tactics &amp; Anatomy land mighty blows; Eval Int empowers thy castings, and low Magery makes spells fizzle. Watch every swing in the <b>Combat</b> tab of thy journal.</p>
     <h3>Hunting Grounds</h3><div class="cardgrid">`;
   MONSTERS.forEach(m=>{
     const eff=state.combatStyle==='magery'?mg:ws;
@@ -1004,7 +1230,7 @@ function renderTabs(){
   tabsDirtyAt=Date.now();
 }
 function renderLive(){
-  renderSkills(); renderChar(); renderTask(); renderInv();
+  renderSkills(); renderChar(); renderTask(); renderTaskStats(); renderJournal(); renderInv();
   if(Date.now()-tabsDirtyAt>5000) renderTabs(); // refresh unlock states etc.
 }
 
@@ -1028,25 +1254,35 @@ document.addEventListener('click',e=>{
   else if(act==='fight') startTask({kind:'combat',monster:el.dataset.mon});
   else if(act==='craft'){
     const r=RECIPE_BY[el.dataset.recipe];
-    if(invCount(craftMatKey(r))<r.qty){log('Thou lackest the materials.','bad');return;}
+    if(invCount(craftMatKey(r))<r.qty){log('Thou lackest the materials.','bad','system');return;}
     startTask({kind:'craft',recipe:r.id});
   }
   else if(act==='train') startTask({kind:'train',skill:el.dataset.skill});
   else if(act==='stop') stopTask('You stop what you were doing.');
+  else if(act==='jtab'){
+    logTab=el.dataset.j;
+    document.querySelectorAll('.jtab').forEach(b=>b.classList.toggle('on',b.dataset.j===logTab));
+    logDirty=true; renderJournal();
+  }
+  else if(act==='clearlog'){clearLog();renderJournal();}
   else if(act==='style'){state.combatStyle=el.dataset.style;renderTabs();}
   else if(act==='buy'){
     const it=SHOP.find(x=>x.key===el.dataset.key);
     const n=+el.dataset.n;
     const cost=it.cost*n;
-    if(state.gold<cost){log('Thou hast not the gold.','bad');return;}
-    state.gold-=cost; addInv(it.key,n); renderTabs();
+    if(state.gold<cost){log('Thou hast not the gold.','bad','system');return;}
+    state.gold-=cost; addInv(it.key,n);
+    log(`Bought ${fmtN(n)} × ${it.name} for ${fmtN(cost)}gp.`,'','loot');
+    renderTabs();
   }
   else if(act==='sellall') sellAll(el.dataset.key);
   else if(act==='cutcloth'){
-    if(invCount('cloth')<1){log('No cloth to cut.','bad');return;}
-    addInv('cloth',-1); addInv('bandage',2); renderTabs();
+    if(invCount('cloth')<1){log('No cloth to cut.','bad','system');return;}
+    addInv('cloth',-1); addInv('bandage',2);
+    log('You cut a bolt of cloth into 2 bandages.','','work');
+    renderTabs();
   }
-  else if(act==='save'){save();log('Game saved.');}
+  else if(act==='save'){save();log('Game saved.','','system');}
   else if(act==='reset'){
     if(confirm('Truly erase thy character and start anew? This cannot be undone.')){
       localStorage.removeItem(SAVE_KEY);
@@ -1078,14 +1314,16 @@ document.addEventListener('change',e=>{
 if(!load()){
   state=freshState();
   recalcDerived();
-  log('Welcome to Britannia, young adventurer!','epic');
-  log('Pick a task — mine ore, hunt mongbats, or hide in the shadows. Skills rise by use, as they always have.');
-  log('There is no 700-point skill cap in these lands. Grandmaster them all.');
+  log('Welcome to Britannia, young adventurer!','epic','system');
+  log('Pick a task — mine ore, hunt mongbats, or hide in the shadows. Skills rise by use, as they always have.','','system');
+  log('The journal is kept in tabs: Combat records every hit and miss, Labour every success and failure.','','system');
+  log('There is no 700-point skill cap in these lands. Grandmaster them all.','','system');
 }else{
   recalcDerived();
   offlineCatchup();
-  log('Thy tale continues…');
+  log('Thy tale continues…','','system');
 }
+buildJournalTabs();
 buildSkillRows();
 renderTabs();
 renderLive();
