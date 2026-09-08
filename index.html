@@ -61,10 +61,10 @@ header h1 small{display:block;font-size:12px;color:var(--dim);letter-spacing:2px
 
 /* bars */
 .bar{position:relative;height:16px;background:#0d0b08;border:1px solid var(--stone-br);border-radius:4px;overflow:hidden}
-.bar .fill{position:absolute;inset:0;width:0%;transition:width .2s linear}
+.bar .fill{position:absolute;inset:0;width:100%;transform:scaleX(0);transform-origin:left center;will-change:transform;backface-visibility:hidden}
 .bar.hp .fill{background:linear-gradient(#c65454,#8a2727)}
 .bar.mana .fill{background:linear-gradient(#5f83c9,#2a4685)}
-.bar.prog .fill{background:linear-gradient(#d9b84a,#96762a);transition:none}
+.bar.prog .fill{background:linear-gradient(#d9b84a,#96762a)}
 .bar.mon .fill{background:linear-gradient(#7fa85a,#4a6b2f)}
 .bar .txt{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:10px;color:#fff;text-shadow:0 1px 2px #000;font-variant-numeric:tabular-nums}
 
@@ -708,16 +708,25 @@ function simulate(seconds){
   }
 }
 
-let lastFrame=Date.now();
-function tick(){
-  const now=Date.now();
+let lastFrame=Date.now(), lastLive=0;
+function step(now){
   let dt=(now-lastFrame)/1000;
   lastFrame=now;
   if(dt<0) dt=0;
   if(dt>5){simulate(Math.min(dt,36000));}
   else advance(dt);
   state.lastSeen=now;
-  renderLive();
+  return dt;
+}
+/* The world advances and the bars are redrawn every animation frame; the heavier
+   panels (skills, inventory, tabs) still refresh a few times a second. */
+function frame(){
+  requestAnimationFrame(frame);
+  const now=Date.now();
+  const dt=step(now);
+  renderBars();
+  animateBars(dt);
+  if(now-lastLive>=200){lastLive=now;renderLive();}
 }
 
 /* =============== offline progress =============== */
@@ -794,13 +803,55 @@ function renderSkills(){
   $('#gTotal').textContent=fmt1(totalSkill());
   $('#hTotal').textContent=fmt1(totalSkill());
 }
-function setBar(fillId,txtId,cur,max,txt){
-  document.getElementById(fillId).style.width=(max>0?clamp(cur/max*100,0,100):0)+'%';
-  if(txtId) document.getElementById(txtId).textContent=txt!==undefined?txt:`${Math.ceil(cur)} / ${Math.ceil(max)}`;
+/* Bars are drawn with scaleX (sub-pixel, GPU friendly) and moved every animation
+   frame rather than every game tick, so they glide instead of stepping.
+   mode 'track' follows the value exactly — for values that already change
+   continuously, like task progress. mode 'ease' glides toward the value — for
+   values that jump, like hp, mana and monster health. */
+const barAnim={};
+function drawBar(b){ b.el.style.transform='scaleX('+b.shown.toFixed(4)+')'; }
+function setBar(fillId,txtId,cur,max,txt,mode){
+  const p=max>0?clamp(cur/max,0,1):0;
+  let b=barAnim[fillId];
+  if(!b){
+    const el=document.getElementById(fillId);
+    if(!el) return;
+    b=barAnim[fillId]={el,shown:p,target:p,mode:mode||'ease'};
+    drawBar(b);
+  }
+  if(mode) b.mode=mode;
+  b.target=p;
+  if(b.mode==='track'&&b.shown!==p){b.shown=p;drawBar(b);}
+  if(txtId){
+    const t=document.getElementById(txtId);
+    const v=txt!==undefined?txt:`${Math.ceil(cur)} / ${Math.ceil(max)}`;
+    if(t&&t.textContent!==v) t.textContent=v;
+  }
+}
+function animateBars(dt){
+  const k=1-Math.exp(-dt*14); // frame-rate independent approach toward the target
+  for(const id in barAnim){
+    const b=barAnim[id];
+    if(b.mode==='track') continue;
+    const d=b.target-b.shown;
+    if(Math.abs(d)<0.0004){ if(b.shown!==b.target){b.shown=b.target;drawBar(b);} continue; }
+    b.shown+=d*k;
+    drawBar(b);
+  }
+}
+/* the handful of bars that must move every frame */
+function renderBars(){
+  setBar('hpFill','hpTxt',state.hp,derived.maxHp,`${Math.ceil(state.hp)} / ${derived.maxHp} HP`,'ease');
+  setBar('manaFill','manaTxt',state.mana,derived.maxMana,`${Math.floor(state.mana)} / ${derived.maxMana} Mana`,'ease');
+  const t=state.task;
+  if(t) setBar('taskFill','taskTxt',t.acc||0,taskDuration(t),'','track');
+  else setBar('taskFill','taskTxt',0,1,'','track');
+  if(t&&t.kind==='combat'){
+    const m=MON_BY[t.monster];
+    setBar('monFill','monTxt',Math.max(0,t.monHp),m.hp,`${Math.max(0,Math.ceil(t.monHp))} / ${m.hp}`,'ease');
+  }
 }
 function renderChar(){
-  setBar('hpFill','hpTxt',state.hp,derived.maxHp,`${Math.ceil(state.hp)} / ${derived.maxHp} HP`);
-  setBar('manaFill','manaTxt',state.mana,derived.maxMana,`${Math.floor(state.mana)} / ${derived.maxMana} Mana`);
   $('#sStr').textContent=state.stats.str;
   $('#sDex').textContent=state.stats.dex;
   $('#sInt').textContent=state.stats.int;
@@ -818,17 +869,12 @@ function renderTask(){
   const t=state.task;
   $('#taskName').textContent=taskLabel(t);
   $('#stopBtn').style.display=t?'':'none';
-  if(t){
-    const dur=taskDuration(t);
-    setBar('taskFill','taskTxt',t.acc||0,dur,'');
-  }else setBar('taskFill','taskTxt',0,1,'');
   const mr=$('#monRow');
   if(t&&t.kind==='combat'){
     mr.style.display='flex';
-    const m=MON_BY[t.monster];
-    $('#monName').textContent=m.name;
-    setBar('monFill','monTxt',Math.max(0,t.monHp),m.hp,`${Math.max(0,Math.ceil(t.monHp))} / ${m.hp}`);
+    $('#monName').textContent=MON_BY[t.monster].name;
   }else mr.style.display='none';
+  renderBars();
 }
 function renderInv(){
   const keys=Object.keys(state.inv).filter(k=>state.inv[k]>0);
@@ -1090,7 +1136,9 @@ buildSkillRows();
 renderTabs();
 renderLive();
 lastFrame=Date.now();
-setInterval(tick,250);
+requestAnimationFrame(frame);
+/* frames stop in a hidden tab — keep the world ticking (unrendered) meanwhile */
+setInterval(()=>{if(document.hidden) step(Date.now());},1000);
 setInterval(save,15000);
 window.addEventListener('beforeunload',save);
 /* debug hook (harmless): SF.simulate(3600) fast-forwards an hour */
