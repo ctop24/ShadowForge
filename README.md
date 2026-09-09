@@ -29,7 +29,23 @@ Classic UO skill mechanics, idle-game pacing:
 2. **Craft** — smith weapons and armor from any ingot color (better material = better item = higher skill needed). Items better than your gear are auto-equipped; the rest are sold. Tailors work hides into armor, alchemists brew heal potions, cooks turn fish into steaks (Well Fed regen buff).
 3. **Hunt** — thirteen monsters from Mongbat to Balron. Fight as a **Warrior** (Swords/Tactics/Anatomy) or a **Mage** (Magery/Eval Int — casts your best affordable spell, Magic Arrow through Flamestrike). Bandages, potions, and food are used automatically; Hiding and Stealth grant dodge.
 4. **Die occasionally** — "Thou art dead!" costs 10% of your gold; a wandering healer resurrects you and you rejoin the fight (three deaths in a row and you're told to seek easier prey).
-5. **Idle** — one active task at a time, like a proper macro session. Offline progress is simulated for up to 10 hours and summarized when you return.
+5. **Idle** — one active task at a time, like a proper macro session. Offline progress is simulated for up to 10 hours and summarized when you return — including the hit/miss and success/failure tallies from whatever you left running.
+
+## The journal
+
+Every action writes a line, and the journal is filed into tabs so one subject can be read at a time:
+
+| Tab | What lands there |
+|---|---|
+| **Combat** | Every swing: hits with damage, misses, *mighty blows* (criticals from Tactics/Anatomy), spells cast and fizzled, the monster's hits and your dodges, bandages applied and fumbled, kills and deaths |
+| **Labour** | Gathering and crafting outcomes — success, failure ("You loosen the rock, but find no usable ore"), rich veins, and *exceptional* crafts; hiding and stealth attempts |
+| **Skills** | Every 0.1 skill gain, stat gains, new titles, and skill caps reached |
+| **Loot** | Corpse spoils, power scrolls, coins found, sales and purchases |
+| **System** | Task changes, resurrection, food, saves |
+
+Repeated lines collapse with a `×N` counter, each line is timestamped, and **Clear** empties the log.
+
+Above the tabs, the task bar keeps a running tally of the current task — swings/hits/misses and hit rate, mighty blows, damage dealt and taken, dodges and bandages while fighting; attempts/success/failure and exceptional or rich finds while gathering, crafting, or training. It resets when you start a new task.
 
 ## Saving
 
